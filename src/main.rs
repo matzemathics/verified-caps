@@ -19,11 +19,8 @@ use vstd::{
     simple_pptr::{PPtr, PointsTo},
 };
 
-mod bin_tree;
 mod linear;
-mod machina;
 mod ptr_map;
-mod traits;
 mod treap;
 
 verus! {
