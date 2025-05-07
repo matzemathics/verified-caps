@@ -126,11 +126,7 @@ impl LinSystem {
 
         assert(node.generation@ < self.generation@);
         assert(self.node_conditions(node));
-        assert(
-            forall |key: LinKey|
-            self.map@.contains_key(key@) ==> self.node_conditions(#[trigger] self.map@[key@].value()));
 
-        let ghost old_map = self.map@;
         let (_, child_ptr) = self.map.insert(new, node);
 
         proof! {
@@ -143,16 +139,10 @@ impl LinSystem {
             implies self.node_conditions(#[trigger] self.map@[key@].value()) by {};
         };
 
-        assert(self.node_conditions(self.follow(node.parent)));
-        assert(self.follow(node.parent).child.inner != 0 ==>
-            self.node_conditions( self.follow(self.follow(node.parent).child)));
-        let ghost old_self = *self;
-
         let mut parent_node = self.map.take(parent_ptr, Ghost(parent), Ghost(Set::empty()));
 
         proof!{ self.addr_nonnull(new) };
         let child_link = LinLink { inner: child_ptr.addr(), key: Ghost(Some(new)) };
-        assert(self.valid(child_link));
 
         if parent_node.child.inner != 0 {
             assert(self.follow(child_link).generation@ == node.generation@);
@@ -160,19 +150,16 @@ impl LinSystem {
 
             let ghost vacated = Set::empty().insert(parent@);
             let mut next_child = self.map.take(PPtr::from_addr(parent_node.child.inner), Ghost(parent_node.child.key@.unwrap()), Ghost(vacated));
-            assert(old_self.node_conditions(next_child));
 
             assert(next_child.generation@ < node.generation@ == self.follow(child_link).generation@);
             assert(self.valid(child_link));
 
             next_child.prev = child_link;
-            assert(old_self.node_conditions(next_child));
 
             self.map.untake(PPtr::from_addr(parent_node.child.inner), Ghost(parent_node.child.key@.unwrap()), next_child, Ghost(vacated));
         }
 
         parent_node.child = child_link;
-        assert(self.node_conditions(parent_node));
 
         self.map.untake(parent_ptr, Ghost(parent), parent_node, Ghost(Set::empty()));
     }
