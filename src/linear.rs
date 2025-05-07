@@ -51,17 +51,17 @@ struct LinSystem {
 impl LinSystem {
     spec fn valid(&self, link: LinLink) -> bool {
         link.inner == 0 ||
-        self.map@.contains_key(link.key@.unwrap()@) && self.map@[link.key@.unwrap()@].addr() == link.inner
+        self.map@.contains_key(link.key@.unwrap()@) && self.map@[link.key@.unwrap()@].0 == link.inner
     }
 
     spec fn follow(&self, link: LinLink) -> LinNode
     recommends self.valid(link) && link.inner != 0
     {
-        self.map@[link.key@.unwrap()@].value()
+        self.map@[link.key@.unwrap()@].1.value()
     }
 
     spec fn contains_node(&self, node: LinNode) -> bool {
-        exists |k: LinKey| #[trigger] self.map@.dom().contains(k@) && self.map@[k@].value() == node
+        exists |k: LinKey| #[trigger] self.map@.dom().contains(k@) && self.map@[k@].1.value() == node
     }
 
     spec fn node_conditions(&self, node: LinNode) -> bool {
@@ -99,7 +99,7 @@ impl LinSystem {
 
         &&& self.map.wf()
         &&& forall |key: LinKey| self.map@.contains_key(key@) ==> {
-            let node = #[trigger] self.map@[key@].value(); {
+            let node = #[trigger] self.map@[key@].1.value(); {
                 &&& self.node_conditions(node)
                 &&& self.correctly_linked_horizontal(key, node)
                 &&& self.correctly_linked_vertical(key, node)
@@ -109,14 +109,14 @@ impl LinSystem {
 
     spec fn view(&self) -> Map<LinKey, Seq<LinNode>> {
         Map::new(|k: LinKey| self.map@.dom().contains(k@), |k: LinKey| {
-            let v = self.map@[k@].value();
+            let v = self.map@[k@].1.value();
             Seq::insert(children(self, v), 0, v)
         })
     }
 
     proof fn addr_nonnull(tracked &self, key: LinKey)
     requires self.map@.dom().contains(key@)
-    ensures self.map@[key@].addr() != 0
+    ensures self.map@[key@].0 != 0
     {
         self.map.tracked_borrow().tracked_borrow(key@).is_nonnull()
     }
@@ -145,7 +145,7 @@ impl LinSystem {
             prev: LinLink::null(),
         };
 
-        assert(self.node_conditions(self.map@[parent@].value()));
+        assert(self.node_conditions(self.map@[parent@].1.value()));
         assert(self.follow(node.parent).generation@ < node.generation@);
 
         self.generation = Ghost(self.generation@ + 1);
@@ -159,7 +159,7 @@ impl LinSystem {
             assert forall |key: LinKey|
             self.map@.contains_key(key@) && key@ != new@
             implies {
-                let node = #[trigger] self.map@[key@].value(); {
+                let node = #[trigger] self.map@[key@].1.value(); {
                     &&& self.node_conditions(node)
                     &&& self.correctly_linked_horizontal(key, node)
                     &&& self.correctly_linked_vertical(key, node)
@@ -204,7 +204,7 @@ impl LinSystem {
             assert forall |key: LinKey|
             self.map@.contains_key(key@)
             implies {
-                self.correctly_linked_vertical(key, #[trigger] self.map@[key@].value())
+                self.correctly_linked_vertical(key, #[trigger] self.map@[key@].1.value())
             }
             by {
                 if key@ == new@ { }
@@ -220,15 +220,15 @@ impl LinSystem {
             assert forall |key: LinKey|
             self.map@.contains_key(key@)
             implies {
-                self.correctly_linked_horizontal(key, #[trigger] self.map@[key@].value())
+                self.correctly_linked_horizontal(key, #[trigger] self.map@[key@].1.value())
             }
             by {
                 if key@ == new@ { }
                 else if key@ == parent@ {
-                    assert(self.correctly_linked_horizontal(parent, self.map@[parent@].value()));
+                    assert(self.correctly_linked_horizontal(parent, self.map@[parent@].1.value()));
                 }
                 else if node.next.inner != 0 && node.next.key@.unwrap()@ == key@ {
-                    assert(self.correctly_linked_horizontal(node.next.key@.unwrap(), self.map@[node.next.key@.unwrap()@].value()));
+                    assert(self.correctly_linked_horizontal(node.next.key@.unwrap(), self.map@[node.next.key@.unwrap()@].1.value()));
                 }
                 else {
                     // other nodes did not changes
