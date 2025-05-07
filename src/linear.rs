@@ -1,12 +1,15 @@
 use alloc::string::String;
-use vstd::prelude::*;
+use vstd::{prelude::*, simple_pptr::PPtr};
 
-use crate::{ptr_map::MutPointerMap, traits::Link};
+use crate::ptr_map::MutPointerMap;
 
 verus! {
 
 struct LinNode {
     data: u64,
+    generation: Ghost<nat>,
+    child: LinLink,
+    parent: LinLink,
     next: LinLink,
     prev: LinLink,
 }
@@ -17,14 +20,19 @@ type LinKey = String;
 struct LinLink {
     inner: usize,
     key: Ghost<Option<LinKey>>,
-    count: Ghost<nat>,
 }
 
 impl LinLink {
-    fn null() -> Self {
+    spec fn spec_null() -> Self {
+        LinLink { inner: 0, key: Ghost(None) }
+    }
+
+    #[verifier::when_used_as_spec(spec_null)]
+    fn null() -> Self
+    returns Self::null()
+    {
         LinLink {
             inner: 0,
-            count: Ghost(0),
             key: Ghost(None)
         }
     }
@@ -36,7 +44,8 @@ impl LinLink {
 }
 
 struct LinSystem {
-    map: MutPointerMap<LinKey, LinNode>
+    map: MutPointerMap<LinKey, LinNode>,
+    generation: Ghost<nat>,
 }
 
 impl LinSystem {
@@ -55,23 +64,21 @@ impl LinSystem {
         exists |k: LinKey| #[trigger] self.map@.dom().contains(k@) && self.map@[k@].value() == node
     }
 
-    spec fn decreasing_next(&self) -> bool {
-        forall |node: LinNode| #[trigger] self.contains_node(node) ==>
-            self.valid(node.next) && (node.next.inner != 0 ==>
-                self.follow(node.next).next.count@ < node.next.count@)
-    }
-
-    spec fn prev_link_wf(&self, node: LinNode) -> bool {
-        self.valid(node.prev) &&
-        (node.prev.inner != 0 ==> self.follow(node.prev).prev.count@ < node.prev.count@)
-    }
-
-    spec fn decreasing_prev(&self) -> bool {
-        forall |key: LinKey| self.map@.contains_key(key@) ==> #[trigger] self.prev_link_wf(self.map@[key@].value())
+    spec fn node_conditions(&self, node: LinNode) -> bool {
+        &&& node.generation@ < self.generation@
+        &&& self.valid(node.parent)
+        &&& (node.parent.inner != 0 ==> self.follow(node.parent).generation@ < node.generation@)
+        &&& self.valid(node.child)
+        &&& (node.child.inner != 0 ==> self.follow(node.child).generation@ > node.generation@)
+        &&& self.valid(node.next)
+        &&& (node.next.inner != 0 ==> self.follow(node.next).generation@ < node.generation@)
+        &&& self.valid(node.prev)
+        &&& (node.prev.inner != 0 ==> self.follow(node.prev).generation@ > node.generation@)
     }
 
     spec fn wf(&self) -> bool {
-        self.decreasing_next() && self.decreasing_prev() && self.map.wf()
+        &&& self.map.wf()
+        &&& forall |key: LinKey| self.map@.contains_key(key@) ==> self.node_conditions(#[trigger] self.map@[key@].value())
     }
 
     spec fn view(&self) -> Map<LinKey, Seq<LinNode>> {
@@ -79,34 +86,6 @@ impl LinSystem {
             let v = self.map@[k@].value();
             Seq::insert(children(self, v), 0, v)
         })
-    }
-
-    proof fn make_space(&mut self, key: LinKey)
-    requires
-        old(self).wf(),
-        old(self).map@.contains_key(key@)
-    ensures
-        self.wf(),
-        old(self)@ == self@,
-        self.map@[key@].value().next.count@ == old(self).map@[key@].value().next.count@ + 1
-    decreases
-        old(self).map@[key@].value().prev.count@
-    {
-        assert(self.map@.contains_key(key@));
-        let node = self.map@[key@].value();
-        if node.prev.inner == 0 {
-            admit();
-        }
-        else {
-            let next = node.prev.key@.unwrap();
-
-            assert(self.prev_link_wf(node));
-            assert(self.map@.contains_key(next@));
-            assert(decreases_to!(node.prev.count@ => self.map@[next@].value().prev.count@));
-
-            self.make_space(next);
-            admit()
-        }
     }
 
     proof fn addr_nonnull(tracked &self, key: LinKey)
@@ -120,94 +99,102 @@ impl LinSystem {
     requires
         new@ != parent@,
         old(self).wf(),
-        old(self).map@.dom().contains(parent@)
+        old(self).map@.contains_key(parent@),
+        !old(self).map@.contains_key(new@),
     ensures
         self.wf()
     {
-        let ghost parent_count = self.map@[parent@].value().prev.count@;
         let parent_ptr = self.map.get_ptr(&parent).unwrap();
-        proof! { self.addr_nonnull(parent); };
 
-        let prev = LinLink {
-            inner: parent_ptr.addr(),
-            key: Ghost(Some(parent)),
-            count: Ghost(parent_count + 1)
-        };
+        proof!{ self.addr_nonnull(parent) };
+        let parent_link = LinLink { inner: parent_ptr.addr(), key: ghost_exec(Some(parent)) };
+        let next_link = self.map.read(parent_ptr, Ghost(parent)).child;
 
-        assert(self.valid(prev));
         let node = LinNode {
-            data, prev, next: LinLink::null()
+            data,
+            generation: self.generation,
+            child: LinLink::null(),
+            parent: parent_link,
+            next: next_link,
+            prev: LinLink::null(),
         };
 
-        assert(self.map@[parent@].addr() == parent_ptr.addr());
+        assert(self.node_conditions(self.map@[parent@].value()));
+        assert(self.follow(node.parent).generation@ < node.generation@);
 
-        let (_, new_ptr) = self.map.insert(new, node);
-        proof! { self.addr_nonnull(new); };
+        self.generation = Ghost(self.generation@ + 1);
 
-        let new_link = LinLink {
-            inner: new_ptr.addr(),
-            key: Ghost(Some(new)),
-            count: Ghost(1),
-        };
+        assert(node.generation@ < self.generation@);
+        assert(self.node_conditions(node));
+        assert(
+            forall |key: LinKey|
+            self.map@.contains_key(key@) ==> self.node_conditions(#[trigger] self.map@[key@].value()));
 
-        assert(self.valid(new_link));
+        let ghost old_map = self.map@;
+        let (_, child_ptr) = self.map.insert(new, node);
 
         proof! {
-            assert(new@ != parent@);
-            assert(old(self).map@[parent@] == self.map@[parent@]);
-            assert(self.map@[parent@].addr() == parent_ptr.addr());
+            assert forall |key: LinKey|
+            self.map@.contains_key(key@) && key@ != new@
+            implies #[trigger] self.map@[key@] == old(self).map@[key@] by {};
+
+            assert forall |key: LinKey|
+            self.map@.contains_key(key@) && key@ != new@
+            implies self.node_conditions(#[trigger] self.map@[key@].value()) by {};
         };
 
-        assert(old(self).contains_node(self.map@[parent@].value()));
+        assert(self.node_conditions(self.follow(node.parent)));
+        assert(self.follow(node.parent).child.inner != 0 ==>
+            self.node_conditions( self.follow(self.follow(node.parent).child)));
+        let ghost old_self = *self;
 
-        let mut parent_node = self.map.take(parent_ptr, Ghost(parent@), Ghost(Set::empty()));
-        parent_node.next = new_link;
-        self.map.untake(parent_ptr, Ghost(parent@), parent_node, Ghost(Set::empty()));
+        let mut parent_node = self.map.take(parent_ptr, Ghost(parent), Ghost(Set::empty()));
 
-        let ghost parent_node = self.map@[parent@].value();
-        assert(self.map@.contains_key(parent@));
-        assert(self.contains_node(parent_node));
-        assert(parent_node.prev == old(self).map@[parent@].value().prev);
-        assert(old(self).follow(parent_node.prev) == self.follow(parent_node.prev)) by {
-            admit()
-        };
-        assert(old(self).prev_link_wf(old(self).map@[parent@].value()));
-        assert(old(self).valid(parent_node.prev));
-        assert(self.valid(parent_node.prev)) by {
-            if parent_node.prev.inner == 0 {}
-            else {
-                assert(parent_node.prev.inner == old(self).map@[parent_node.prev.key@.unwrap()@].addr());
-                assume(parent_node.prev.key@.unwrap()@ != new@);
-                assume(parent_node.prev.key@.unwrap()@ != parent@);
-                assert(parent_node.prev.inner == self.map@[parent_node.prev.key@.unwrap()@].addr());
-                admit()
-            }
-        };
+        proof!{ self.addr_nonnull(new) };
+        let child_link = LinLink { inner: child_ptr.addr(), key: Ghost(Some(new)) };
+        assert(self.valid(child_link));
 
-        assert(self.prev_link_wf(parent_node));
+        if parent_node.child.inner != 0 {
+            assert(self.follow(child_link).generation@ == node.generation@);
+            assert(self.follow(parent_node.child).generation@ < node.generation@);
 
-        assert(self.decreasing_next()) by { admit() };
+            let ghost vacated = Set::empty().insert(parent@);
+            let mut next_child = self.map.take(PPtr::from_addr(parent_node.child.inner), Ghost(parent_node.child.key@.unwrap()), Ghost(vacated));
+            assert(old_self.node_conditions(next_child));
 
-        assert(self.decreasing_prev()) by { admit() };
+            assert(next_child.generation@ < node.generation@ == self.follow(child_link).generation@);
+            assert(self.valid(child_link));
+
+            next_child.prev = child_link;
+            assert(old_self.node_conditions(next_child));
+
+            self.map.untake(PPtr::from_addr(parent_node.child.inner), Ghost(parent_node.child.key@.unwrap()), next_child, Ghost(vacated));
+        }
+
+        parent_node.child = child_link;
+        assert(self.node_conditions(parent_node));
+
+        self.map.untake(parent_ptr, Ghost(parent), parent_node, Ghost(Set::empty()));
     }
 }
 
 #[via_fn]
 proof fn children_decreases_proof(this: &LinSystem, node: LinNode)
 {
-    if node.next.inner != 0 {
-        assert(this.valid(node.next));
-        assert(decreases_to!(node.next.count => this.follow(node.next).next.count)) by { };
+    if node.child.inner != 0 {
+        assert(this.node_conditions(node));
+        assert(this.node_conditions(this.follow(node.child)));
+        assert(this.generation@ - this.follow(node.child).generation@ < this.generation@ - node.generation@);
     }
 }
 
 spec(checked) fn children(this: &LinSystem, node: LinNode) -> Seq<LinNode>
-decreases node.next.count
-    when this.decreasing_next() && this.contains_node(node)
+decreases this.generation@ - node.generation@
+    when this.wf() && this.contains_node(node)
     via children_decreases_proof
 {
-    if node.next.inner != 0 {
-        let direct = this.follow(node.next);
+    if node.child.inner != 0 {
+        let direct = this.follow(node.child);
         let indirect = children(this, direct);
         Seq::insert(indirect, 0, direct)
     }

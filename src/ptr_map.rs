@@ -94,7 +94,8 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
         old(self).wf()
     ensures
         self.wf(),
-        forall |k1: Key::V| k1 != k@ ==> self@[k1] == #[trigger] old(self)@[k1],
+        forall |k1: Key| self@.contains_key(k1@) && k1@ != k@ ==>
+            self@[k1@] == #[trigger] old(self)@[k1@],
         self@.dom() == old(self)@.dom().insert(k@),
         old(self).index_opt(k@) == res.0,
         self@[k@].value() == v,
@@ -200,47 +201,48 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
         }
     }
 
-    pub fn take(&mut self, element: PPtr<Value>, key: Ghost<Key::V>, vacated: Ghost<Set<Key::V>>) -> (res: Value)
+    pub fn take(&mut self, element: PPtr<Value>, key: Ghost<Key>, vacated: Ghost<Set<Key::V>>) -> (res: Value)
     requires
         old(self).vacated(vacated@),
-        !vacated@.contains(key@),
-        old(self)@.contains_key(key@) && old(self)@[key@].addr() == element.addr()
+        !vacated@.contains(key@@),
+        old(self)@.contains_key(key@@) && old(self)@[key@@].addr() == element.addr()
     ensures
-        self.vacated(vacated@.insert(key@)),
+        self.vacated(vacated@.insert(key@@)),
         self@.dom() == old(self)@.dom(),
-        forall |k1: Key::V| k1 != key ==> #[trigger] self@[k1] == #[trigger] old(self)@[k1],
-        self@[key@].addr() == element.addr(),
-        res == old(self)@[key@].value()
+        forall |k1: Key| k1@ != key@@ && self@.contains_key(k1@) ==> #[trigger] self@[k1@] == old(self)@[k1@],
+        self@[key@@].addr() == old(self)@[key@@].addr(),
+        res == old(self)@[key@@].value()
     {
-        let tracked perm = self.credits.borrow_mut().tracked_remove(*key.borrow());
+        let tracked perm = self.credits.borrow_mut().tracked_remove(key.borrow().view());
         assert(perm.addr() == element.addr());
         let result = element.take(Tracked(&mut perm));
 
         proof!{
-            self.credits.borrow_mut().tracked_insert(*key.borrow(), perm);
+            self.credits.borrow_mut().tracked_insert(key.borrow().view(), perm);
             assert(self.credit_addrs() == self.map_addrs());
         };
 
         result
     }
 
-    pub fn untake(&mut self, element: PPtr<Value>, key: Ghost<Key::V>, value: Value, vacated: Ghost<Set<Key::V>>)
+    pub fn untake(&mut self, element: PPtr<Value>, key: Ghost<Key>, value: Value, vacated: Ghost<Set<Key::V>>)
     requires
-        old(self).vacated(vacated@.insert(key@)),
-        old(self)@.contains_key(key@) && old(self)@[key@].addr() == element.addr()
+        old(self).vacated(vacated@.insert(key@@)),
+        old(self)@.contains_key(key@@) && old(self)@[key@@].addr() == element.addr()
     ensures
         self.vacated(vacated@),
         self@.dom() == old(self)@.dom(),
-        forall |k1: Key::V| k1 != key ==> #[trigger] self@[k1] == #[trigger] old(self)@[k1],
-        self@[key@].value() == value,
+        forall |k1: Key| k1@ != key@@ && self@.contains_key(k1@) ==> #[trigger] self@[k1@] == old(self)@[k1@],
+        self@[key@@].value() == value,
+        self@[key@@].addr() == element.addr(),
     {
-        let tracked perm = self.credits.borrow_mut().tracked_remove(*key.borrow());
+        let tracked perm = self.credits.borrow_mut().tracked_remove(key.borrow().view());
         assert(perm.addr() == element.addr());
         proof! { perm.leak_contents(); };
         element.put(Tracked(&mut perm), value);
 
         proof!{
-            self.credits.borrow_mut().tracked_insert(*key.borrow(), perm);
+            self.credits.borrow_mut().tracked_insert(key.borrow().view(), perm);
             assert(self.credit_addrs() == self.map_addrs());
         };
     }
@@ -265,6 +267,14 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
             }
             None => None
         }
+    }
+
+    pub fn read(&self, element: PPtr<Value>, key: Ghost<Key>) -> &Value
+    requires self.wf() && self@.contains_key(key@@) && self@[key@@].addr() == element.addr()
+    returns self@[key@@].value()
+    {
+        proof!{ self.lemma_dom_credits_eq_dom_m(); };
+        element.borrow(Tracked(self.borrow_perm(key@@)))
     }
 }
 
