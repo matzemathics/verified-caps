@@ -1,4 +1,4 @@
-use alloc::{collections::btree_map::Cursor, string::String};
+use alloc::string::String;
 use vstd::{prelude::*, simple_pptr::PPtr};
 
 use crate::ptr_map::MutPointerMap;
@@ -76,30 +76,34 @@ impl LinSystem {
         &&& (node.prev.inner != 0 ==> self.follow(node.prev).generation@ > node.generation@)
     }
 
-    spec fn correctly_linked_horizontal(&self, node: LinNode) -> bool
+    spec fn correctly_linked_horizontal(&self, key: LinKey, node: LinNode) -> bool
     recommends self.node_conditions(node)
     {
         &&& node.next.inner != 0 ==>
-            self.follow(node.next).prev.inner != 0 && self.follow(self.follow(node.next).prev) == node
+            self.follow(node.next).prev.inner != 0 && self.follow(node.next).prev.key@.unwrap()@ == key@
         &&& node.prev.inner != 0 ==>
-            self.follow(node.prev).next.inner != 0 && self.follow(self.follow(node.prev).next) == node
+            self.follow(node.prev).next.inner != 0 && self.follow(node.prev).next.key@.unwrap()@ == key@
     }
 
-    spec fn correctly_linked_vertical(&self, node: LinNode) -> bool
+    spec fn correctly_linked_vertical(&self, key: LinKey, node: LinNode) -> bool
     recommends self.node_conditions(node)
     {
         &&& node.child.inner != 0 ==> {
             &&& self.follow(node.child).prev.inner == 0
             &&& self.follow(node.child).parent.inner != 0
-            &&& self.follow(self.follow(node.child).parent) == node
+            &&& self.follow(node.child).parent.key@.unwrap()@ == key@
         }
     }
 
     spec fn wf(&self) -> bool {
+
         &&& self.map.wf()
         &&& forall |key: LinKey| self.map@.contains_key(key@) ==> {
-            &&& self.node_conditions(self.map@[key@].value())
-            &&& self.correctly_linked_horizontal(#[trigger] self.map@[key@].value())
+            let node = #[trigger] self.map@[key@].value(); {
+                &&& self.node_conditions(node)
+                &&& self.correctly_linked_horizontal(key, node)
+                &&& self.correctly_linked_vertical(key, node)
+            }
         }
     }
 
@@ -155,16 +159,18 @@ impl LinSystem {
             assert forall |key: LinKey|
             self.map@.contains_key(key@) && key@ != new@
             implies {
-                &&& self.node_conditions(self.map@[key@].value())
-                &&& self.correctly_linked_horizontal(#[trigger] self.map@[key@].value())
+                let node = #[trigger] self.map@[key@].value(); {
+                    &&& self.node_conditions(node)
+                    &&& self.correctly_linked_horizontal(key, node)
+                    &&& self.correctly_linked_vertical(key, node)
+                }
             }
             by {
                 assert(self.map@[key@] == old(self).map@[key@]);
             };
         };
 
-        assert(node.next.inner !== 0 ==> self.correctly_linked_horizontal(self.follow(node.next)));
-        assert(self.correctly_linked_horizontal(self.follow(node.parent)));
+        assert(self.correctly_linked_horizontal(parent, self.follow(node.parent)));
         let ghost old_self = *self;
 
         {
@@ -183,6 +189,7 @@ impl LinSystem {
                 assert(next_child.generation@ < node.generation@ == self.follow(child_link).generation@);
                 assert(self.valid(child_link));
 
+                assert(next_child.prev.inner == 0);
                 next_child.prev = child_link;
 
                 self.map.untake(PPtr::from_addr(parent_node.child.inner), Ghost(parent_node.child.key@.unwrap()), next_child, Ghost(vacated));
@@ -197,30 +204,34 @@ impl LinSystem {
             assert forall |key: LinKey|
             self.map@.contains_key(key@)
             implies {
-                self.correctly_linked_horizontal(#[trigger] self.map@[key@].value())
+                self.correctly_linked_vertical(key, #[trigger] self.map@[key@].value())
             }
             by {
                 if key@ == new@ { }
                 else if key@ == parent@ {
-                    assert(old(self).map@[parent@].value().next == self.map@[parent@].value().next);
-                    assert(old(self).map@[parent@].value().prev == self.map@[parent@].value().prev);
-                    admit();
                 }
-                else if node.next.inner != 0 && key@ == node.next.key@.unwrap()@ {
-                    admit();
+                else if node.next.inner != 0 && node.next.key@.unwrap()@ == key@ {
                 }
                 else {
-                    let ghost current = old(self).map@[key@].value();
-                    assert(old(self).correctly_linked_horizontal(current));
+                    // other nodes did not changes
+                }
+            };
 
-                    if current.prev.inner != 0 {
-                        admit();
-                    }
-                    if current.next.inner != 0 {
-                        admit();
-                    }
-
-                    assert(self.correctly_linked_horizontal(current));
+            assert forall |key: LinKey|
+            self.map@.contains_key(key@)
+            implies {
+                self.correctly_linked_horizontal(key, #[trigger] self.map@[key@].value())
+            }
+            by {
+                if key@ == new@ { }
+                else if key@ == parent@ {
+                    assert(self.correctly_linked_horizontal(parent, self.map@[parent@].value()));
+                }
+                else if node.next.inner != 0 && node.next.key@.unwrap()@ == key@ {
+                    assert(self.correctly_linked_horizontal(node.next.key@.unwrap(), self.map@[node.next.key@.unwrap()@].value()));
+                }
+                else {
+                    // other nodes did not changes
                 }
             };
         };
