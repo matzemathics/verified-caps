@@ -1,4 +1,4 @@
-use alloc::string::String;
+use alloc::{collections::btree_map::Cursor, string::String};
 use vstd::{prelude::*, simple_pptr::PPtr};
 
 use crate::ptr_map::MutPointerMap;
@@ -76,9 +76,31 @@ impl LinSystem {
         &&& (node.prev.inner != 0 ==> self.follow(node.prev).generation@ > node.generation@)
     }
 
+    spec fn correctly_linked_horizontal(&self, node: LinNode) -> bool
+    recommends self.node_conditions(node)
+    {
+        &&& node.next.inner != 0 ==>
+            self.follow(node.next).prev.inner != 0 && self.follow(self.follow(node.next).prev) == node
+        &&& node.prev.inner != 0 ==>
+            self.follow(node.prev).next.inner != 0 && self.follow(self.follow(node.prev).next) == node
+    }
+
+    spec fn correctly_linked_vertical(&self, node: LinNode) -> bool
+    recommends self.node_conditions(node)
+    {
+        &&& node.child.inner != 0 ==> {
+            &&& self.follow(node.child).prev.inner == 0
+            &&& self.follow(node.child).parent.inner != 0
+            &&& self.follow(self.follow(node.child).parent) == node
+        }
+    }
+
     spec fn wf(&self) -> bool {
         &&& self.map.wf()
-        &&& forall |key: LinKey| self.map@.contains_key(key@) ==> self.node_conditions(#[trigger] self.map@[key@].value())
+        &&& forall |key: LinKey| self.map@.contains_key(key@) ==> {
+            &&& self.node_conditions(self.map@[key@].value())
+            &&& self.correctly_linked_horizontal(#[trigger] self.map@[key@].value())
+        }
     }
 
     spec fn view(&self) -> Map<LinKey, Seq<LinNode>> {
@@ -132,36 +154,76 @@ impl LinSystem {
         proof! {
             assert forall |key: LinKey|
             self.map@.contains_key(key@) && key@ != new@
-            implies #[trigger] self.map@[key@] == old(self).map@[key@] by {};
-
-            assert forall |key: LinKey|
-            self.map@.contains_key(key@) && key@ != new@
-            implies self.node_conditions(#[trigger] self.map@[key@].value()) by {};
+            implies {
+                &&& self.node_conditions(self.map@[key@].value())
+                &&& self.correctly_linked_horizontal(#[trigger] self.map@[key@].value())
+            }
+            by {
+                assert(self.map@[key@] == old(self).map@[key@]);
+            };
         };
 
-        let mut parent_node = self.map.take(parent_ptr, Ghost(parent), Ghost(Set::empty()));
+        assert(node.next.inner !== 0 ==> self.correctly_linked_horizontal(self.follow(node.next)));
+        assert(self.correctly_linked_horizontal(self.follow(node.parent)));
+        let ghost old_self = *self;
 
-        proof!{ self.addr_nonnull(new) };
-        let child_link = LinLink { inner: child_ptr.addr(), key: Ghost(Some(new)) };
+        {
+            let mut parent_node = self.map.take(parent_ptr, Ghost(parent), Ghost(Set::empty()));
 
-        if parent_node.child.inner != 0 {
-            assert(self.follow(child_link).generation@ == node.generation@);
-            assert(self.follow(parent_node.child).generation@ < node.generation@);
+            proof!{ self.addr_nonnull(new) };
+            let child_link = LinLink { inner: child_ptr.addr(), key: Ghost(Some(new)) };
 
-            let ghost vacated = Set::empty().insert(parent@);
-            let mut next_child = self.map.take(PPtr::from_addr(parent_node.child.inner), Ghost(parent_node.child.key@.unwrap()), Ghost(vacated));
+            if next_link.inner != 0 {
+                assert(self.follow(child_link).generation@ == node.generation@);
+                assert(self.follow(parent_node.child).generation@ < node.generation@);
 
-            assert(next_child.generation@ < node.generation@ == self.follow(child_link).generation@);
-            assert(self.valid(child_link));
+                let ghost vacated = Set::empty().insert(parent@);
+                let mut next_child = self.map.take(PPtr::from_addr(parent_node.child.inner), Ghost(parent_node.child.key@.unwrap()), Ghost(vacated));
 
-            next_child.prev = child_link;
+                assert(next_child.generation@ < node.generation@ == self.follow(child_link).generation@);
+                assert(self.valid(child_link));
 
-            self.map.untake(PPtr::from_addr(parent_node.child.inner), Ghost(parent_node.child.key@.unwrap()), next_child, Ghost(vacated));
+                next_child.prev = child_link;
+
+                self.map.untake(PPtr::from_addr(parent_node.child.inner), Ghost(parent_node.child.key@.unwrap()), next_child, Ghost(vacated));
+            }
+
+            parent_node.child = child_link;
+
+            self.map.untake(parent_ptr, Ghost(parent), parent_node, Ghost(Set::empty()));
         }
 
-        parent_node.child = child_link;
+        proof! {
+            assert forall |key: LinKey|
+            self.map@.contains_key(key@)
+            implies {
+                self.correctly_linked_horizontal(#[trigger] self.map@[key@].value())
+            }
+            by {
+                if key@ == new@ { }
+                else if key@ == parent@ {
+                    assert(old(self).map@[parent@].value().next == self.map@[parent@].value().next);
+                    assert(old(self).map@[parent@].value().prev == self.map@[parent@].value().prev);
+                    admit();
+                }
+                else if node.next.inner != 0 && key@ == node.next.key@.unwrap()@ {
+                    admit();
+                }
+                else {
+                    let ghost current = old(self).map@[key@].value();
+                    assert(old(self).correctly_linked_horizontal(current));
 
-        self.map.untake(parent_ptr, Ghost(parent), parent_node, Ghost(Set::empty()));
+                    if current.prev.inner != 0 {
+                        admit();
+                    }
+                    if current.next.inner != 0 {
+                        admit();
+                    }
+
+                    assert(self.correctly_linked_horizontal(current));
+                }
+            };
+        };
     }
 }
 
