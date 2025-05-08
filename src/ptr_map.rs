@@ -95,12 +95,8 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
         old(self).wf()
     ensures
         self.wf(),
-        forall |k1: Key| self@.contains_key(k1@) && k1@ != k@ ==>
-            self@[k1@] == #[trigger] old(self)@[k1@],
-        self@.dom() == old(self)@.dom().insert(k@),
+        self@ == old(self)@.insert(k@, (res.1.addr(), MemContents::Init(v))),
         old(self).index_opt(k@) == res.0,
-        self@[k@].1.value() == v,
-        self@[k@].0 == res.1.addr()
     {
         let (ptr, perm) = PPtr::new(v);
 
@@ -133,6 +129,7 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
             self.credits.borrow_mut().tracked_insert(k@, perm);
             assert(self@.dom() == old(self)@.dom().insert(k@));
             assert(self.credit_addrs() =~= Map::insert(old(self).map_addrs(), k@, ptr.addr()));
+            assert(self@ == old(self)@.insert(k@, (ptr.addr(), MemContents::Init(v))));
         };
 
         (previous, ptr)
@@ -211,9 +208,9 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
     ensures
         self.vacated(vacated@.insert(key@@)),
         self@.dom() == old(self)@.dom(),
-        forall |k1: Key| k1@ != key@@ && self@.contains_key(k1@) ==> #[trigger] self@[k1@] == old(self)@[k1@],
-        self@[key@@].0 == old(self)@[key@@].0,
-        res == old(self)@[key@@].1.value()
+        self@ == old(self)@.insert(key@@, (element.addr(), MemContents::Uninit)),
+        res == old(self)@[key@@].1.value(),
+        self@[key@@].0 == element.addr(),
     {
         let tracked perm = self.credits.borrow_mut().tracked_remove(key.borrow().view());
         assert(perm.addr() == element.addr());
@@ -222,6 +219,10 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
         proof!{
             self.credits.borrow_mut().tracked_insert(key.borrow().view(), perm);
             assert(self.credit_addrs() == self.map_addrs());
+
+            assert(forall |k1: Key| k1@ != key@@ && self@.contains_key(k1@) ==> self@[k1@] == old(self)@[k1@]);
+            assert(self@.contains_key(key@@) && self@[key@@] == (element.addr(), MemContents::<Value>::Uninit));
+            assert(self@ == old(self)@.insert(key@@, (element.addr(), MemContents::Uninit)));
         };
 
         result
@@ -234,9 +235,7 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
     ensures
         self.vacated(vacated@),
         self@.dom() == old(self)@.dom(),
-        forall |k1: Key| k1@ != key@@ && self@.contains_key(k1@) ==> #[trigger] self@[k1@] == old(self)@[k1@],
-        self@[key@@].1.value() == value,
-        self@[key@@].0 == element.addr(),
+        self@ == old(self)@.insert(key@@, (element.addr(), MemContents::Init(value)))
     {
         let tracked perm = self.credits.borrow_mut().tracked_remove(key.borrow().view());
         assert(perm.addr() == element.addr());
@@ -246,6 +245,7 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
         proof!{
             self.credits.borrow_mut().tracked_insert(key.borrow().view(), perm);
             assert(self.credit_addrs() == self.map_addrs());
+            assert(self@ == old(self)@.insert(key@@, (element.addr(), MemContents::Init(value))));
         };
     }
 
