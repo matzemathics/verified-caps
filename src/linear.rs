@@ -1,5 +1,10 @@
 use alloc::string::String;
-use vstd::{cell::MemContents, map::axiom_map_insert_different, prelude::*, simple_pptr::PPtr};
+use vstd::{
+    cell::MemContents,
+    map::{axiom_map_insert_different, axiom_map_insert_same},
+    prelude::*,
+    simple_pptr::PPtr,
+};
 
 use crate::ptr_map::MutPointerMap;
 
@@ -155,38 +160,25 @@ impl LinSystem {
 
         let (_, child_ptr) = self.map.insert(new, node);
 
-        proof! {
-            assert forall |key: LinKey|
-            self.map@.contains_key(key@) && key@ != new@
-            implies {
-                let node = #[trigger] self.map@[key@].1.value(); {
-                    &&& self.node_conditions(node)
-                    &&& self.correctly_linked_horizontal(key, node)
-                    &&& self.correctly_linked_vertical(key, node)
-                }
-            }
-            by {
-                assert(self.map@[key@] == old(self).map@[key@]);
-            };
-        };
-
+        assert(self.node_conditions(node));
         assert(self.correctly_linked_horizontal(parent, self.follow(node.parent)));
-        let ghost old_self = *self;
 
         {
             let mut parent_node = self.map.take(parent_ptr, Ghost(parent), Ghost(Set::empty()));
-            assert(self.map@.contains_key(parent@) && self.map@[parent@].0 == parent_ptr.addr());
 
             proof!{ self.addr_nonnull(new) };
             let child_link = LinLink { inner: child_ptr.addr(), key: Ghost(Some(new)) };
 
             if next_link.inner != 0 {
                 assert(self.follow(child_link).generation@ == node.generation@);
-                assert(self.follow(parent_node.child).generation@ < node.generation@);
+                assert(self.follow(next_link).generation@ < node.generation@);
+
+                assert(next_link == parent_node.child);
+                proof! { use_type_invariant(next_link); };
+                assert(next_link.key@.is_some());
 
                 let ghost vacated = Set::empty().insert(parent@);
-                let mut next_child = self.map.take(PPtr::from_addr(parent_node.child.inner), Ghost(parent_node.child.key@.unwrap()), Ghost(vacated));
-                assert(self.map@.contains_key(parent@) && self.map@[parent@].0 == parent_ptr.addr());
+                let mut next_child = self.map.take(PPtr::from_addr(next_link.inner), Ghost(next_link.key@.unwrap()), Ghost(vacated));
 
                 assert(next_child.generation@ < node.generation@ == self.follow(child_link).generation@);
                 assert(self.valid(child_link));
@@ -194,67 +186,66 @@ impl LinSystem {
                 assert(next_child.prev.inner == 0);
                 next_child.prev = child_link;
 
-                assert(parent_node.child.inner == next_link.inner);
-                proof! { use_type_invariant(parent_node.child); };
-                assert(parent_node.child.key@.is_some());
-
                 assert(self.map@[parent@] == (parent_ptr.addr(), MemContents::<LinNode>::Uninit));
-                assert(parent_node.child.key@.unwrap()@ != parent@);
-                proof! { axiom_map_insert_different(self.map@, parent@, parent_node.child.key@.unwrap()@, (parent_node.child.inner, MemContents::Init(next_child))); };
-                self.map.untake(PPtr::from_addr(parent_node.child.inner), Ghost(parent_node.child.key@.unwrap()), next_child, Ghost(vacated));
-                assert(self.map@.contains_key(parent@));
-                assert(self.map@[parent@] == (parent_ptr.addr(), MemContents::<LinNode>::Uninit));
+                assert(next_link.key@.unwrap()@ != parent@);
+                proof! {
+                    axiom_map_insert_same(self.map@, next_link.key@.unwrap()@, (next_link.inner, MemContents::Init(next_child)));
+                };
+                self.map.untake(PPtr::from_addr(parent_node.child.inner), Ghost(next_link.key@.unwrap()), next_child, Ghost(vacated));
+                assert(self.follow(next_link) == next_child);
             }
 
             parent_node.child = child_link;
 
             assert(self.map@.contains_key(parent@) && self.map@[parent@].0 == parent_ptr.addr());
 
+            proof!{
+                axiom_map_insert_same(self.map@, parent@, (parent_ptr.addr(), MemContents::Init(parent_node)));
+            };
             self.map.untake(parent_ptr, Ghost(parent), parent_node, Ghost(Set::empty()));
+            assert(parent_node == self.follow(parent_link));
         }
 
         proof! {
             assert forall |key: LinKey|
             self.map@.contains_key(key@)
-            implies {
-                self.correctly_linked_vertical(key, #[trigger] self.map@[key@].1.value())
-            }
+            && key@ != parent@
+            && key@ != new@
+            && key@ != next_link.key@.unwrap()@
+            implies self.map@[key@] == old(self).map@[key@]
             by {
-                if key@ == new@ {
-                    admit();
-                }
-                else if key@ == parent@ {
-                    admit();
-                }
-                else if node.next.inner != 0 && node.next.key@.unwrap()@ == key@ {
-                    admit();
+                if next_link.inner != 0 {
+                    assert(self.map@ == old(self).map@
+                        .insert(new@, (child_ptr.addr(), MemContents::Init(node)))
+                        .insert(parent@, (parent_ptr.addr(), MemContents::Uninit))
+                        .insert(next_link.key@.unwrap()@, (next_link.inner, MemContents::Uninit))
+                        .insert(next_link.key@.unwrap()@, (next_link.inner, MemContents::Init(self.follow(next_link))))
+                        .insert(parent@, (parent_ptr.addr(), MemContents::Init(self.follow(parent_link))))
+                    );
                 }
                 else {
-                    // other nodes did not changes
-                    admit();
+                    assert(self.map@ == old(self).map@
+                        .insert(new@, (child_ptr.addr(), MemContents::Init(node)))
+                        .insert(parent@, (parent_ptr.addr(), MemContents::Uninit))
+                        .insert(parent@, (parent_ptr.addr(), MemContents::Init(self.follow(parent_link))))
+                    );
                 }
             };
 
             assert forall |key: LinKey|
             self.map@.contains_key(key@)
             implies {
-                self.correctly_linked_horizontal(key, #[trigger] self.map@[key@].1.value())
+                self.node_conditions(self.map@[key@].1.value()) &&
+                self.correctly_linked_horizontal(key, #[trigger] self.map@[key@].1.value()) &&
+                self.correctly_linked_vertical(key, #[trigger] self.map@[key@].1.value())
             }
             by {
-                if key@ == new@ {
-                    assert(self.correctly_linked_horizontal(new, node));
-                }
-                else if key@ == parent@ {
-                    assert(self.correctly_linked_horizontal(parent, self.map@[parent@].1.value()));
-                }
-                else if node.next.inner != 0 && node.next.key@.unwrap()@ == key@ {
-                    assert(self.correctly_linked_horizontal(key, self.map@[key@].1.value()));
-                }
-                else {
-                    // other nodes did not changes
-                    admit()
-                }
+                if key@ == new@ { }
+                else if key@ == parent@ { }
+                else if node.next.inner != 0 && node.next.key@.unwrap()@ == key@ { }
+                else { }
             };
+
         };
     }
 }
