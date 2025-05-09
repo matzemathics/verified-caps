@@ -1,10 +1,5 @@
 use alloc::string::String;
-use vstd::{
-    cell::MemContents,
-    map::{axiom_map_insert_different, axiom_map_insert_same},
-    prelude::*,
-    simple_pptr::PPtr,
-};
+use vstd::{cell::MemContents, map::axiom_map_insert_same, prelude::*, simple_pptr::PPtr};
 
 use crate::ptr_map::MutPointerMap;
 
@@ -109,6 +104,10 @@ impl LinSystem {
             &&& !self.follow(node.child).parent.is_null()
             &&& self.follow(node.child).parent.key@.unwrap()@ == key@
         }
+        &&& (node.prev.is_null() && !node.parent.is_null()) ==> {
+            &&& !self.follow(node.parent).child.is_null()
+            &&& self.follow(node.parent).child.key@.unwrap()@ == key@
+        }
     }
 
     spec fn wf(&self) -> bool {
@@ -174,7 +173,6 @@ impl LinSystem {
             let child_link = LinLink { inner: child_ptr.addr(), key: Ghost(Some(new)) };
 
             if !next_link.is_null() {
-                assert(next_link == parent_node.child);
                 proof! { use_type_invariant(next_link); };
                 assert(next_link.key@.is_some());
 
@@ -202,7 +200,7 @@ impl LinSystem {
             && key@ != parent@
             && key@ != new@
             && key@ != next_link.key@.unwrap()@
-            implies self.map@[key@] == old(self).map@[key@]
+            implies self.map@[key@] == #[trigger] old(self).map@[key@]
             by {
                 if next_link.is_null() {
                     assert(self.map@ == old(self).map@

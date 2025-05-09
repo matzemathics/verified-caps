@@ -220,7 +220,7 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
             self.credits.borrow_mut().tracked_insert(key.borrow().view(), perm);
             assert(self.credit_addrs() == self.map_addrs());
 
-            assert(forall |k1: Key| k1@ != key@@ && self@.contains_key(k1@) ==> self@[k1@] == old(self)@[k1@]);
+            assert(forall |k1: Key| k1@ != key@@ && self@.contains_key(k1@) ==> self@[k1@] == #[trigger] old(self)@[k1@]);
             assert(self@.contains_key(key@@) && self@[key@@] == (element.addr(), MemContents::<Value>::Uninit));
             assert(self@ == old(self)@.insert(key@@, (element.addr(), MemContents::Uninit)));
         };
