@@ -5,8 +5,10 @@ use crate::ptr_map::MutPointerMap;
 
 verus! {
 
+type KobjData = u64;
+
 struct LinNode {
-    data: u64,
+    data: KobjData,
     generation: Ghost<nat>,
     child: LinLink,
     parent: LinLink,
@@ -57,6 +59,19 @@ impl LinLink {
 struct LinSystem {
     map: MutPointerMap<LinKey, LinNode>,
     generation: Ghost<nat>,
+}
+
+type SpecMap = Map<LinKey, (KobjData, Seq<LinKey>)>;
+
+spec fn insert_child(map: SpecMap, parent_key: LinKey, child_key: LinKey, child_data: KobjData) -> SpecMap
+recommends
+    map.contains_key(parent_key),
+    !map.contains_key(child_key),
+{
+    let (parent_data, parent_children) = map[parent_key];
+    map
+        .insert(parent_key, (parent_data, parent_children.insert(0, child_key)))
+        .insert(child_key, (child_data, Seq::empty()))
 }
 
 impl LinSystem {
@@ -122,10 +137,10 @@ impl LinSystem {
         }
     }
 
-    spec fn view(&self) -> Map<LinKey, Seq<LinNode>> {
+    spec fn view(&self) -> SpecMap {
         Map::new(|k: LinKey| self.map@.dom().contains(k@), |k: LinKey| {
             let v = self.map@[k@].1.value();
-            Seq::insert(children(self, v), 0, v)
+            (v.data, horizontal_keys(self, v.child))
         })
     }
 
@@ -136,7 +151,7 @@ impl LinSystem {
         self.map.tracked_borrow().tracked_borrow(key@).is_nonnull()
     }
 
-    fn insert(&mut self, data: u64, parent: LinKey, new: LinKey)
+    fn insert(&mut self, data: KobjData, parent: LinKey, new: LinKey)
     requires
         new@ != parent@,
         old(self).wf(),
@@ -165,6 +180,9 @@ impl LinSystem {
 
         self.generation = Ghost(self.generation@ + 1);
         let (_, child_ptr) = self.map.insert(new, node);
+
+        assert(self.map@ =~= old(self).map@
+            .insert(new@, (child_ptr.addr(), MemContents::Init(node))));
 
         {
             let mut parent_node = self.map.take(parent_ptr, Ghost(parent), Ghost(Set::empty()));
@@ -195,29 +213,27 @@ impl LinSystem {
         }
 
         proof! {
+            if next_link.is_null() {
+                assert(self.map@ =~= old(self).map@
+                    .insert(new@, (child_ptr.addr(), MemContents::Init(node)))
+                    .insert(parent@, (parent_ptr.addr(), MemContents::Init(self.follow(parent_link))))
+                );
+            }
+            else {
+                assert(self.map@ =~= old(self).map@
+                    .insert(new@, (child_ptr.addr(), MemContents::Init(node)))
+                    .insert(next_link.key@.unwrap()@, (next_link.inner, MemContents::Init(self.follow(next_link))))
+                    .insert(parent@, (parent_ptr.addr(), MemContents::Init(self.follow(parent_link))))
+                );
+            }
+
             assert forall |key: LinKey|
             self.map@.contains_key(key@)
             && key@ != parent@
             && key@ != new@
             && key@ != next_link.key@.unwrap()@
             implies self.map@[key@] == #[trigger] old(self).map@[key@]
-            by {
-                if next_link.is_null() {
-                    assert(self.map@ == old(self).map@
-                        .insert(new@, (child_ptr.addr(), MemContents::Init(node)))
-                        .insert(parent@, (parent_ptr.addr(), MemContents::Uninit))
-                        .insert(parent@, (parent_ptr.addr(), MemContents::Init(self.follow(parent_link))))
-                    );
-                } else {
-                    assert(self.map@ == old(self).map@
-                        .insert(new@, (child_ptr.addr(), MemContents::Init(node)))
-                        .insert(parent@, (parent_ptr.addr(), MemContents::Uninit))
-                        .insert(next_link.key@.unwrap()@, (next_link.inner, MemContents::Uninit))
-                        .insert(next_link.key@.unwrap()@, (next_link.inner, MemContents::Init(self.follow(next_link))))
-                        .insert(parent@, (parent_ptr.addr(), MemContents::Init(self.follow(parent_link))))
-                    );
-                }
-            };
+            by { };
 
             assert forall |key: LinKey|
             self.map@.contains_key(key@)
@@ -232,30 +248,34 @@ impl LinSystem {
                 else if !node.next.is_null() && node.next.key@.unwrap()@ == key@ { }
                 else { }
             };
-
         };
     }
 }
 
 #[via_fn]
-proof fn children_decreases_proof(this: &LinSystem, node: LinNode)
+proof fn children_decreases_proof(this: &LinSystem, link: LinLink)
 {
-    if !node.child.is_null() {
+    if !link.is_null() && !this.follow(link).next.is_null() {
+        let node = this.follow(link);
         assert(this.node_conditions(node));
-        assert(this.node_conditions(this.follow(node.child)));
-        assert(this.generation@ - this.follow(node.child).generation@ < this.generation@ - node.generation@);
+        assert(this.node_conditions(this.follow(node.next)));
+        assert(this.follow(node.next).generation@ < node.generation@);
     }
 }
 
-spec(checked) fn children(this: &LinSystem, node: LinNode) -> Seq<LinNode>
-decreases this.generation@ - node.generation@
-    when this.wf() && this.contains_node(node)
+spec(checked) fn horizontal_keys(this: &LinSystem, link: LinLink) -> Seq<LinKey>
+decreases this.follow(link).generation@
+    when this.wf() && this.valid(link) && !link.is_null()
     via children_decreases_proof
 {
-    if !node.child.is_null() {
-        let direct = this.follow(node.child);
-        let indirect = children(this, direct);
-        Seq::insert(indirect, 0, direct)
+    if !link.is_null() {
+        if this.follow(link).next.is_null() {
+            Seq::empty().insert(0, link.key@.unwrap())
+        }
+        else {
+            let indirect = horizontal_keys(this, this.follow(link).next);
+            Seq::insert(indirect, 0, link.key@.unwrap())
+        }
     }
     else {
         Seq::empty()
