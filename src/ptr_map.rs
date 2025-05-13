@@ -51,6 +51,13 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
         forall |k: Key::V| self.credits@.dom().contains(k) && !vacated.contains(k) ==> #[trigger] self.credits@[k].is_init()
     }
 
+    pub proof fn lemma_is_init(&self, key: Key::V)
+    requires self.wf() && self@.contains_key(key)
+    ensures self@[key].1.is_init()
+    {
+        assert(self.credits@[key].is_init());
+    }
+
     pub fn new() -> (m: Self)
     requires
         vstd::std_specs::hash::obeys_key_model::<Key>(),
