@@ -97,7 +97,7 @@ impl LinSystem {
     spec fn follow(&self, link: LinLink) -> LinNode
     recommends self.valid(link) && !link.is_null()
     {
-        self.map@[link.key@.unwrap()@].1.value()
+        self.node_at(link.key@.unwrap()@)
     }
 
     spec fn node_conditions(&self, node: LinNode) -> bool {
@@ -112,62 +112,61 @@ impl LinSystem {
         &&& (!node.prev.is_null() ==> self.follow(node.prev).generation@ > node.generation@)
     }
 
-    spec fn correctly_linked_horizontal(&self, key: <LinKey as View>::V, node: LinNode) -> bool
-    recommends self.node_conditions(node)
+    spec fn correctly_linked_horizontal(&self, key: <LinKey as View>::V) -> bool
+    recommends self.node_conditions(self.node_at(key))
     {
-        &&& !node.next.is_null() ==>
-            !self.follow(node.next).prev.is_null() && self.follow(node.next).prev.key@.unwrap()@ == key
-        &&& !node.prev.is_null() ==>
-            !self.follow(node.prev).next.is_null() && self.follow(node.prev).next.key@.unwrap()@ == key
+        let node = self.node_at(key); {
+            &&& !node.next.is_null() ==>
+                !self.follow(node.next).prev.is_null() && self.follow(node.next).prev.key@.unwrap()@ == key
+            &&& !node.prev.is_null() ==>
+                !self.follow(node.prev).next.is_null() && self.follow(node.prev).next.key@.unwrap()@ == key
+        }
     }
 
-    spec fn correctly_linked_vertical(&self, key: <LinKey as View>::V, node: LinNode) -> bool
-    recommends self.node_conditions(node)
+    spec fn correctly_linked_vertical(&self, key: <LinKey as View>::V) -> bool
+    recommends self.node_conditions(self.node_at(key))
     {
-        &&& !node.child.is_null() ==> {
-            &&& self.follow(node.child).prev.is_null()
-            &&& !self.follow(node.child).parent.is_null()
-            &&& self.follow(node.child).parent.key@.unwrap()@ == key
-        }
-        &&& (node.prev.is_null() && !node.parent.is_null()) ==> {
-            &&& !self.follow(node.parent).child.is_null()
-            &&& self.follow(node.parent).child.key@.unwrap()@ == key
+        let node = self.node_at(key); {
+            &&& !node.child.is_null() ==> {
+                &&& self.follow(node.child).prev.is_null()
+                &&& !self.follow(node.child).parent.is_null()
+                &&& self.follow(node.child).parent.key@.unwrap()@ == key
+            }
+            &&& (node.prev.is_null() && !node.parent.is_null()) ==> {
+                &&& !self.follow(node.parent).child.is_null()
+                &&& self.follow(node.parent).child.key@.unwrap()@ == key
+            }
         }
     }
 
     spec fn wf(&self) -> bool {
-
         &&& self.map.wf()
         &&& self.locally_finite()
         &&& self.correctly_linked()
     }
 
     spec fn locally_finite(&self) -> bool {
-
         &&& self.map.wf()
-        &&& forall |key: <LinKey as View>::V| self.map@.contains_key(key) ==> {
-            let node = #[trigger] self.map@[key].1.value(); {
-                &&& self.node_conditions(node)
-            }
-        }
+        &&& forall |key: <LinKey as View>::V| self.map@.contains_key(key) ==>
+            #[trigger] self.node_conditions(self.node_at(key))
     }
 
     spec fn correctly_linked(&self) -> bool {
-        forall |key: <LinKey as View>::V| self.map@.contains_key(key) ==> {
-            let node = #[trigger] self.map@[key].1.value(); {
-                &&& self.correctly_linked_horizontal(key, node)
-                &&& self.correctly_linked_vertical(key, node)
-            }
-        }
+        &&& forall |key: <LinKey as View>::V| self.map@.contains_key(key) ==>
+                #[trigger] self.correctly_linked_horizontal(key)
+        &&& forall |key: <LinKey as View>::V| self.map@.contains_key(key) ==>
+                #[trigger] self.correctly_linked_vertical(key)
+    }
+
+    spec fn node_at(&self, key: <LinKey as View>::V) -> LinNode {
+        self.map@[key].1.value()
     }
 
     spec fn almost_correctly_linked(&self, exception: <LinKey as View>::V) -> bool {
-        forall |key: <LinKey as View>::V| self.map@.contains_key(key) && key != exception ==> {
-            let node = #[trigger] self.map@[key].1.value(); {
-                &&& self.correctly_linked_horizontal(key, node)
-                &&& self.correctly_linked_vertical(key, node)
-            }
-        }
+        &&& forall |key: <LinKey as View>::V| self.map@.contains_key(key) && key != exception ==>
+                #[trigger] self.correctly_linked_horizontal(key)
+        &&& forall |key: <LinKey as View>::V| self.map@.contains_key(key) && key != exception ==>
+                #[trigger] self.correctly_linked_vertical(key)
     }
 
     spec fn future_first_child_of(&self, child_link: LinLink, parent: <LinKey as View>::V) -> bool {
@@ -223,7 +222,7 @@ impl LinSystem {
             prev: LinLink::null(),
         };
 
-        assert(self.node_conditions(self.map@[parent@].1.value()));
+        assert(self.node_conditions(self.node_at(parent@)));
         assert(self.follow(node.parent).generation@ < node.generation@);
 
         self.generation = Ghost(self.generation@ + 1);
@@ -233,7 +232,57 @@ impl LinSystem {
             .insert(new@, (child_ptr.addr(), MemContents::Init(node))));
 
         proof! {
-            lemma_unchanged_children(old(self), self);
+            assert forall |key: <LinKey as View>::V|
+            self.map@.contains_key(key)
+            implies #[trigger] self.node_conditions(self.node_at(key))
+            by {
+                if key == new@ {
+                    assert(old(self).node_conditions(old(self).node_at(parent@)));
+                    if !node.next.is_null() {
+                        assert(old(self).node_conditions(old(self).follow(node.next)));
+                    }
+                    assert(self.node_conditions(node));
+                }
+                else {
+                    assert(old(self).node_conditions(old(self).node_at(key)));
+                }
+            };
+
+            assert(self.map@.dom() == old(self).map@.dom().insert(new@));
+
+            assert forall |key: <LinKey as View>::V|
+            self.map@.contains_key(key) && key != new@
+            implies #[trigger] self.correctly_linked_horizontal(key)
+            by {
+                assert(old(self).node_conditions(self.node_at(key)));
+                assert(old(self).correctly_linked_horizontal(key));
+                assert(self.node_at(key) == old(self).node_at(key));
+
+                if !self.node_at(key).prev.is_null() {
+                    assert(self.follow(self.node_at(key).prev) == old(self).follow(self.node_at(key).prev));
+                }
+
+                if !self.node_at(key).next.is_null() {
+                    assert(self.follow(self.node_at(key).next) == old(self).follow(self.node_at(key).next));
+                }
+            };
+
+            assert forall |key: <LinKey as View>::V|
+            self.map@.contains_key(key) && key != new@
+            implies #[trigger] self.correctly_linked_vertical(key)
+            by {
+                assert(old(self).node_conditions(self.node_at(key)));
+                assert(old(self).correctly_linked_vertical(key));
+                assert(self.node_at(key) == old(self).node_at(key));
+
+                if !self.node_at(key).child.is_null() {
+                    assert(self.follow(self.node_at(key).child) == old(self).follow(self.node_at(key).child));
+                }
+
+                if !self.node_at(key).parent.is_null() {
+                    assert(self.follow(self.node_at(key).parent) == old(self).follow(self.node_at(key).parent));
+                }
+            };
 
             assert forall |key: <LinKey as View>::V| self@.contains_key(key)
             implies self@[key] == #[trigger] old(self)@.insert(new@, (data, Seq::empty()))[key]
@@ -243,14 +292,10 @@ impl LinSystem {
                     assert(self@[key] == (data, Seq::<LinKey>::empty()));
                 }
                 else {
-                    let node = self.map@[key].1.value();
-                    assert(old(self).map@.contains_key(key) && node == old(self).map@[key].1.value());
-                    assert(old(self).valid(node.child));
-                    assert(horizontal_keys(self, node.child) == horizontal_keys(old(self), node.child));
-                    assert(self@[key] == old(self)@[key]);
+                    assert(old(self).node_conditions(old(self).node_at(key)));
+                    lemma_unchanged_children_rec(old(self), self, self.node_at(key).child);
                 }
             };
-
         };
 
         assert(self@ =~= old(self)@.insert(new@, (data, Seq::empty())));
@@ -288,7 +333,20 @@ impl LinSystem {
         proof!{ use_type_invariant(child_link); };
         let parent_link = self.read_link(child_link).parent;
         let parent_ptr = PPtr::from_addr(parent_link.inner);
+
+        proof!{ use_type_invariant(parent_link); };
         let ghost parent_key = parent_link.key@.unwrap();
+
+        assert(self.valid(child_link));
+        assert(self.node_conditions(self.follow(child_link)));
+        assert(self.valid(parent_link));
+
+        assert(self.node_conditions(self.node_at(parent_key@)));
+
+        proof!{
+            if !self.follow(parent_link).child.is_null() {
+            }
+        };
 
         let mut parent_node = self.map.take(parent_ptr, Ghost(parent_key), Ghost(Set::empty()));
 
@@ -300,6 +358,7 @@ impl LinSystem {
 
             let mut next_node = self.map.take(next_ptr, Ghost(next_key), Ghost(vacated));
 
+            assert(old(self).correctly_linked_vertical(parent_key@));
             assert(next_node.prev.is_null());
             next_node.prev = child_link;
 
@@ -317,31 +376,78 @@ impl LinSystem {
         proof! {
             let next_link = self.follow(child_link).next;
             if next_link.is_null() {
-                assert(self.map@ =~= old(self).map@
+                assert(self.map@ == old(self).map@
+                    .insert(parent_key@, (parent_link.inner, MemContents::Uninit))
                     .insert(parent_key@, (parent_link.inner, MemContents::Init(self.follow(parent_link))))
                 );
             }
             else {
                 let next_key = next_link.key@.unwrap();
 
-                assert(self.map@ =~= old(self).map@
-                    .insert(parent_key@, (parent_link.inner, MemContents::Init(self.follow(parent_link))))
+                assert(self.map@ == old(self).map@
+                    .insert(parent_key@, (parent_link.inner, MemContents::Uninit))
+                    .insert(next_key@, (next_link.inner, MemContents::Uninit))
                     .insert(next_key@, (next_link.inner, MemContents::Init(self.follow(next_link))))
+                    .insert(parent_key@, (parent_link.inner, MemContents::Init(self.follow(parent_link))))
                 );
             }
 
             assert forall |key: <LinKey as View>::V|
             self.map@.contains_key(key)
-            implies {
-                self.node_conditions(self.map@[key].1.value()) &&
-                self.correctly_linked_horizontal(key, #[trigger] self.map@[key].1.value()) &&
-                self.correctly_linked_vertical(key, self.map@[key].1.value())
-            }
+            implies #[trigger] self.node_conditions(self.node_at(key))
             by {
-                if key == child_link.key@.unwrap()@ { }
-                else if key == parent_key@ { }
-                else if !self.follow(child_link).next.is_null() && self.follow(child_link).next.key@.unwrap()@ == key { }
-                else { }
+                if key == child_link.key@.unwrap()@ {
+                    assert(self.node_conditions(self.node_at(key)));
+                }
+                else if key == parent_key@ {
+                    assert(self.node_conditions(self.node_at(key)));
+                }
+                else if !self.follow(child_link).next.is_null() && self.follow(child_link).next.key@.unwrap()@ == key {
+                    assert(old(self).node_conditions(old(self).node_at(key)));
+                    assert(self.node_conditions(self.node_at(key)));
+                }
+                else {
+                    assert(old(self).node_conditions(old(self).node_at(key)));
+                }
+            };
+
+            assert forall |key: <LinKey as View>::V|
+            self.map@.contains_key(key)
+            implies #[trigger] self.correctly_linked_horizontal(key)
+            by {
+                if key == child_link.key@.unwrap()@ {
+                    assert(self.correctly_linked_horizontal(key));
+                }
+                else if key == parent_key@ {
+                    assert(old(self).correctly_linked_horizontal(parent_key@));
+                }
+                else if !self.follow(child_link).next.is_null() && self.follow(child_link).next.key@.unwrap()@ == key {
+                    assert(old(self).correctly_linked_horizontal(key));
+                    assert(self.correctly_linked_horizontal(key));
+                }
+                else {
+                    assert(old(self).correctly_linked_horizontal(key));
+                }
+            };
+
+            assert forall |key: <LinKey as View>::V|
+            self.map@.contains_key(key)
+            implies #[trigger] self.correctly_linked_vertical(key)
+            by {
+                if key == child_link.key@.unwrap()@ {
+                    assert(self.correctly_linked_vertical(key));
+                }
+                else if key == parent_key@ {
+                    assert(old(self).correctly_linked_vertical(key));
+                    assert(self.correctly_linked_vertical(key));
+                }
+                else if !self.follow(child_link).next.is_null() && self.follow(child_link).next.key@.unwrap()@ == key {
+                    assert(old(self).correctly_linked_vertical(key));
+                    assert(self.correctly_linked_vertical(key));
+                }
+                else {
+                    assert(old(self).correctly_linked_vertical(key));
+                }
             };
 
             let old_parent_node = old(self).follow(parent_link);
@@ -349,7 +455,23 @@ impl LinSystem {
             let expected = old(self)@
                 .insert(parent_key@, (old_parent_node.data, old_parent_children.insert(0, child_link.key@.unwrap())));
 
-            lemma_unchanged_children(old(self), self);
+            assert forall |key: <LinKey as View>::V| self@.contains_key(key)
+            implies self@[key] == #[trigger] expected[key]
+            by {
+                if key == child_link.key@.unwrap()@ { }
+                else if key == parent_key@ {
+                    lemma_unchanged_children_rec(old(self), self, self.node_at(key).child);
+                }
+                else if !self.follow(child_link).next.is_null() && self.follow(child_link).next.key@.unwrap()@ == key {
+                    assert(old(self).node_conditions(old(self).node_at(key)));
+                    assert(old(self).node_at(key).child == self.node_at(key).child);
+                    lemma_unchanged_children_rec(old(self), self, self.node_at(key).child);
+                }
+                else {
+                    assert(old(self).node_conditions(old(self).node_at(key)));
+                    lemma_unchanged_children_rec(old(self), self, self.node_at(key).child);
+                }
+            };
 
             assert(self@ =~= expected);
         };
@@ -418,7 +540,7 @@ requires
     forall |key: <LinKey as View>::V| old.map@.contains_key(key) ==>
         #[trigger] new.map@[key].0 == old.map@[key].0,
     forall |key: <LinKey as View>::V| old.map@.contains_key(key) ==>
-        new.map@[key].1.value().next == #[trigger] old.map@[key].1.value().next
+        new.node_at(key).next == #[trigger] old.node_at(key).next
 ensures horizontal_keys(new, link) == horizontal_keys(old, link)
 decreases horizontal_keys(old, link).len()
 {
@@ -435,6 +557,9 @@ decreases horizontal_keys(old, link).len()
 
         assert(old.follow(link).next == new.follow(link).next);
         let next = old.follow(link).next;
+
+        assert(old.node_conditions(old.follow(link)));
+        assert(old.valid(next));
 
         let old_rest = horizontal_keys(old, next);
         let new_rest = horizontal_keys(new, next);
