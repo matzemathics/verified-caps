@@ -88,8 +88,10 @@ recommends
 
 impl LinSystem {
     spec fn valid(&self, link: LinLink) -> bool {
-        link.is_null() ||
-        self.map@.contains_key(link.key@.unwrap()@) && self.map@[link.key@.unwrap()@].0 == link.inner
+        link.wf() && (
+            link.is_null() ||
+            self.map@.contains_key(link.key@.unwrap()@) && self.map@[link.key@.unwrap()@].0 == link.inner
+        )
     }
 
     spec fn follow(&self, link: LinLink) -> LinNode
@@ -204,7 +206,7 @@ impl LinSystem {
         self@ == old(self)@.insert(new@, (data, Seq::empty())),
         self.almost_correctly_linked(new@),
         self.future_first_child_of(r, parent@),
-        r.key@.unwrap()@ == new@
+        r.key@.unwrap() == new
     {
         let parent_ptr = self.map.get_ptr(&parent).unwrap();
 
@@ -265,6 +267,14 @@ impl LinSystem {
         self.map.read(PPtr::from_addr(link.inner), Ghost(link.key@.unwrap()))
     }
 
+    spec fn update_parent_link(&self, child_link: LinLink) -> SpecMap
+    recommends self.valid(child_link) && !child_link.is_null()
+    {
+        let parent_link = self.follow(child_link).parent;
+        let parent_key = parent_link.key@.unwrap();
+        self@.insert(parent_key@, (self@[parent_key@].0, self@[parent_key@].1.insert(0, child_link.key@.unwrap())))
+    }
+
     fn update_links(&mut self, child_link: LinLink)
     requires
         old(self).map.wf(),
@@ -272,7 +282,8 @@ impl LinSystem {
         exists |parent: <LinKey as View>::V| old(self).future_first_child_of(child_link, parent),
         old(self).almost_correctly_linked(child_link.key@.unwrap()@),
     ensures
-        self.wf()
+        self.wf(),
+        self@ == old(self).update_parent_link(child_link)
     {
         proof!{ use_type_invariant(child_link); };
         let parent_link = self.read_link(child_link).parent;
@@ -312,25 +323,11 @@ impl LinSystem {
             }
             else {
                 let next_key = next_link.key@.unwrap();
-                let next_uninit = (next_link.inner, MemContents::<LinNode>::Uninit);
-                let next_value = (next_link.inner, MemContents::Init(self.follow(next_link)));
-                let parent_uninit = (parent_link.inner, MemContents::<LinNode>::Uninit);
-                let parent_value = (parent_link.inner, MemContents::Init(self.follow(parent_link)));
-                let expected_map = old(self).map@.insert(next_key@, next_value).insert(parent_key@, parent_value);
 
-                assert(self.map@.dom() == expected_map.dom());
-                self.map.lemma_is_init(next_key@);
-
-                assert(self.map@ == old(self).map@
-                    .insert(parent_key@, parent_uninit)
-                    .insert(next_key@, next_uninit)
-                    .insert(next_key@, next_value)
-                    .insert(parent_key@, parent_value)
+                assert(self.map@ =~= old(self).map@
+                    .insert(parent_key@, (parent_link.inner, MemContents::Init(self.follow(parent_link))))
+                    .insert(next_key@, (next_link.inner, MemContents::Init(self.follow(next_link))))
                 );
-
-                assert forall |key: <LinKey as View>::V| self.map@.contains_key(key)
-                implies self.map@[key] == expected_map[key]
-                by { };
             }
 
             assert forall |key: <LinKey as View>::V|
@@ -346,15 +343,107 @@ impl LinSystem {
                 else if !self.follow(child_link).next.is_null() && self.follow(child_link).next.key@.unwrap()@ == key { }
                 else { }
             };
+
+            let old_parent_node = old(self).follow(parent_link);
+            let old_parent_children = old(self)@[parent_key@].1;
+            let expected = old(self)@
+                .insert(parent_key@, (old_parent_node.data, old_parent_children.insert(0, child_link.key@.unwrap())));
+
+            lemma_unchanged_children(old(self), self);
+
+            assert(self@ =~= expected);
         };
+    }
+
+    fn insert_and_update(&mut self, data: KobjData, parent: LinKey, new: LinKey)
+    requires
+        new@ != parent@,
+        old(self).wf(),
+        old(self).map@.contains_key(parent@),
+        !old(self).map@.contains_key(new@),
+    ensures
+        self.wf(),
+        self@ == insert_child(old(self)@, parent, new, data)
+    {
+        let child_link = self.insert(data, parent, new);
+
+        let ghost parent_key = self.follow(child_link).parent.key@.unwrap();
+        assert(parent_key@ == parent@);
+
+        assert(self@ == old(self)@.insert(new@, (data, Seq::empty())));
+        assert(self@[parent@] == old(self)@[parent@]);
+
+        assert(child_link.key@.unwrap() == new);
+
+        assert(self.update_parent_link(child_link) ==
+            self@.insert(parent_key@, (self@[parent@].0, self@[parent@].1.insert(0, new))));
+
+        assert(self.update_parent_link(child_link) ==
+            old(self)@
+                .insert(new@, (data, Seq::empty()))
+                .insert(parent_key@, (self@[parent@].0, self@[parent@].1.insert(0, new))));
+
+        assert(self.update_parent_link(child_link) =~= insert_child(old(self)@, parent, new, data));
+
+        self.update_links(child_link);
     }
 }
 
 proof fn lemma_unchanged_children(old: &LinSystem, new: &LinSystem)
-requires forall |key: <LinKey as View>::V| old.map@.contains_key(key) ==> new.map@[key] == #[trigger] old.map@[key]
+requires
+    new.locally_finite(),
+    old.locally_finite(),
+    forall |key: <LinKey as View>::V| old.map@.contains_key(key) ==>
+        #[trigger] new.map@.contains_key(key),
+    forall |key: <LinKey as View>::V| old.map@.contains_key(key) ==>
+        #[trigger] new.map@[key].0 == old.map@[key].0,
+    forall |key: <LinKey as View>::V| old.map@.contains_key(key) ==>
+        new.map@[key].1.value().next == #[trigger] old.map@[key].1.value().next
 ensures forall |link: LinLink| old.valid(link) ==> #[trigger] horizontal_keys(new, link) == horizontal_keys(old, link)
 {
-    admit();
+    assert forall |link: LinLink| old.valid(link)
+    implies #[trigger] horizontal_keys(new, link) =~= horizontal_keys(old, link)
+    by {
+        lemma_unchanged_children_rec(old, new, link)
+    };
+}
+
+proof fn lemma_unchanged_children_rec(old: &LinSystem, new: &LinSystem, link: LinLink)
+requires
+    new.locally_finite(),
+    old.locally_finite(),
+    old.valid(link),
+    forall |key: <LinKey as View>::V| old.map@.contains_key(key) ==>
+        #[trigger] new.map@.contains_key(key),
+    forall |key: <LinKey as View>::V| old.map@.contains_key(key) ==>
+        #[trigger] new.map@[key].0 == old.map@[key].0,
+    forall |key: <LinKey as View>::V| old.map@.contains_key(key) ==>
+        new.map@[key].1.value().next == #[trigger] old.map@[key].1.value().next
+ensures horizontal_keys(new, link) == horizontal_keys(old, link)
+decreases horizontal_keys(old, link).len()
+{
+    if link.is_null() {
+        lemma_is_null_empty_keys(new, link);
+        lemma_is_null_empty_keys(old, link);
+    }
+    else {
+        assert(old.valid(link));
+        let key = link.key@.unwrap();
+        assert(new.map@.contains_key(key@));
+
+        assert(new.valid(link));
+
+        assert(old.follow(link).next == new.follow(link).next);
+        let next = old.follow(link).next;
+
+        let old_rest = horizontal_keys(old, next);
+        let new_rest = horizontal_keys(new, next);
+
+        assert(horizontal_keys(old, link) == old_rest.insert(0, key));
+        assert(horizontal_keys(new, link) == new_rest.insert(0, key));
+
+        lemma_unchanged_children_rec(old, new, next);
+    }
 }
 
 #[via_fn]
