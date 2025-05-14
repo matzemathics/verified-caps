@@ -591,21 +591,4 @@ ensures horizontal_keys(this, link) == Seq::<LinKey>::empty()
     }
 }
 
-proof fn lemma_next_link_insert(tracked this: &LinSystem, link: LinLink)
-requires
-    this.locally_finite(),
-    this.valid(link) && this.valid(this.follow(link).next),
-    !link.is_null(),
-ensures
-    horizontal_keys(this, link) == horizontal_keys(this, this.follow(link).next).insert(0, link.key@.unwrap())
-{
-    if this.follow(link).next.is_null() {
-        assert(horizontal_keys(this, link) =~= Seq::empty().insert(0, link.key@.unwrap()));
-        assert(horizontal_keys(this, this.follow(link).next) =~= Seq::empty());
-    }
-    else {
-        assert(horizontal_keys(this, link) =~= horizontal_keys(this, this.follow(link).next).insert(0, link.key@.unwrap()));
-    }
-}
-
 }
