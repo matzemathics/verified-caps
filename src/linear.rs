@@ -511,25 +511,6 @@ impl LinSystem {
     }
 }
 
-proof fn lemma_unchanged_children(old: &LinSystem, new: &LinSystem)
-requires
-    new.locally_finite(),
-    old.locally_finite(),
-    forall |key: <LinKey as View>::V| old.map@.contains_key(key) ==>
-        #[trigger] new.map@.contains_key(key),
-    forall |key: <LinKey as View>::V| old.map@.contains_key(key) ==>
-        #[trigger] new.map@[key].0 == old.map@[key].0,
-    forall |key: <LinKey as View>::V| old.map@.contains_key(key) ==>
-        new.map@[key].1.value().next == #[trigger] old.map@[key].1.value().next
-ensures forall |link: LinLink| old.valid(link) ==> #[trigger] horizontal_keys(new, link) == horizontal_keys(old, link)
-{
-    assert forall |link: LinLink| old.valid(link)
-    implies #[trigger] horizontal_keys(new, link) =~= horizontal_keys(old, link)
-    by {
-        lemma_unchanged_children_rec(old, new, link)
-    };
-}
-
 proof fn lemma_unchanged_children_rec(old: &LinSystem, new: &LinSystem, link: LinLink)
 requires
     new.locally_finite(),
