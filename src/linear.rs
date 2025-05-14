@@ -1,10 +1,5 @@
-use alloc::{collections::btree_map::Keys, string::String};
-use vstd::{
-    cell::MemContents,
-    map::{axiom_map_insert_different, axiom_map_insert_same},
-    prelude::*,
-    simple_pptr::{self, PPtr},
-};
+use alloc::string::String;
+use vstd::{cell::MemContents, map::axiom_map_insert_same, prelude::*, simple_pptr::PPtr};
 
 use crate::ptr_map::MutPointerMap;
 
