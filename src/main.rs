@@ -21,6 +21,7 @@ use vstd::{
 
 mod linear;
 mod ptr_map;
+mod state;
 mod treap;
 
 verus! {

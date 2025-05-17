@@ -387,8 +387,7 @@ impl LinSystem {
                 );
             }
 
-            assert forall |key: <LinKey as View>::V|
-            self.map@.contains_key(key)
+            assert forall |key: <LinKey as View>::V| self.map@.contains_key(key)
             implies #[trigger] self.node_conditions(self.node_at(key))
             by {
                 if key == child_link.key@.unwrap()@ {
@@ -406,8 +405,7 @@ impl LinSystem {
                 }
             };
 
-            assert forall |key: <LinKey as View>::V|
-            self.map@.contains_key(key)
+            assert forall |key: <LinKey as View>::V| self.map@.contains_key(key)
             implies #[trigger] self.correctly_linked_horizontal(key)
             by {
                 if key == child_link.key@.unwrap()@ {
@@ -425,8 +423,7 @@ impl LinSystem {
                 }
             };
 
-            assert forall |key: <LinKey as View>::V|
-            self.map@.contains_key(key)
+            assert forall |key: <LinKey as View>::V| self.map@.contains_key(key)
             implies #[trigger] self.correctly_linked_vertical(key)
             by {
                 if key == child_link.key@.unwrap()@ {
@@ -445,10 +442,11 @@ impl LinSystem {
                 }
             };
 
-            let old_parent_node = old(self).follow(parent_link);
-            let old_parent_children = old(self)@[parent_key@].1;
             let expected = old(self)@
-                .insert(parent_key@, (old_parent_node.data, old_parent_children.insert(0, child_link.key@.unwrap())));
+                .insert(parent_key@, (
+                    old(self).follow(parent_link).data,
+                    old(self)@[parent_key@].1.insert(0, child_link.key@.unwrap())
+                ));
 
             assert forall |key: <LinKey as View>::V| self@.contains_key(key)
             implies self@[key] == #[trigger] expected[key]
