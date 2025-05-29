@@ -244,14 +244,20 @@ requires
     0 <= offset < arg[origin].len(),
 ensures exists |index|
     0 <= index < arg.flatten().len() && arg.flatten()[index] == arg[origin][offset]
-
+decreases arg.len()
 {
     if origin == 0 {
         axiom_seq_add_index1(arg.first(), arg.drop_first().flatten(), offset);
         assert(arg[0][offset] == arg.flatten()[offset]);
     }
     else {
-        admit()
+        lemma_flatten_index2(arg.drop_first(), origin - 1, offset);
+        let index = choose |index: int|
+            0 <= index < arg.drop_first().flatten().len() &&
+            arg.drop_first().flatten()[index] == arg[origin][offset];
+
+        axiom_seq_add_index2(arg.first(), arg.drop_first().flatten(), index + arg.first().len());
+        assert(arg[origin][offset] == arg.flatten()[index + arg.first().len()]);
     }
 }
 
