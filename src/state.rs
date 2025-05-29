@@ -1,14 +1,9 @@
-use alloc::string::String;
 use state_machines_macros::state_machine;
 use vstd::{
-    assert_by_contradiction,
-    map_lib::lemma_submap_of_trans,
+    atomic::PermissionIsize,
     prelude::*,
     seq::{axiom_seq_add_index1, axiom_seq_add_index2, axiom_seq_new_index},
-    seq_lib::{lemma_flatten_concat, lemma_seq_concat_contains_all_elements},
-    set_lib::{
-        lemma_len_union, lemma_len_union_ind, lemma_set_difference_len, lemma_set_disjoint_lens,
-    },
+    seq_lib::lemma_seq_contains,
 };
 
 verus! {
@@ -243,6 +238,23 @@ decreases arg.len()
     }
 }
 
+proof fn lemma_flatten_index2<A>(arg: Seq<Seq<A>>, origin: int, offset: int)
+requires
+    0 <= origin < arg.len(),
+    0 <= offset < arg[origin].len(),
+ensures exists |index|
+    0 <= index < arg.flatten().len() && arg.flatten()[index] == arg[origin][offset]
+
+{
+    if origin == 0 {
+        axiom_seq_add_index1(arg.first(), arg.drop_first().flatten(), offset);
+        assert(arg[0][offset] == arg.flatten()[offset]);
+    }
+    else {
+        admit()
+    }
+}
+
 #[via_fn]
 proof fn transitive_children_decreases(map: CapMap, keys: Seq<CapKey>, bound: nat)
 {
@@ -293,7 +305,6 @@ decreases needles.len()
 pub open spec fn transitive_children(map: CapMap, keys: Seq<CapKey>, bound: nat) -> Seq<CapKey>
 decreases bound - keys.map_values(|key| map[key].generation as int).min()
     when keys.to_set().subset_of(map.dom())
-        && map.dom().finite()
         && connected(map)
         && generation_bounded(map, bound)
     via transitive_children_decreases
@@ -302,6 +313,64 @@ decreases bound - keys.map_values(|key| map[key].generation as int).min()
 
     if new_keys.len() == 0 { keys }
     else { keys + transitive_children(map, new_keys, bound) }
+}
+
+proof fn lemma_direct_children_complete(map: CapMap, keys: Seq<CapKey>, parent: CapKey, child: CapKey)
+requires
+    map.contains_key(parent),
+    map[parent].children.contains(child),
+    keys.contains(parent),
+ensures
+    direct_children(map, keys).contains(child)
+{
+    let parent_index = choose |index: int| 0 <= index < keys.len() && keys[index] == parent;
+    let child_offset = choose |index: int| 0 <= index < map[parent].children.len() && map[parent].children[index] == child;
+
+    let children = |key: CapKey| map[key].children;
+    lemma_flatten_index2(keys.map_values(children), parent_index, child_offset);
+}
+
+proof fn lemma_transitive_children_complete(map: CapMap, keys: Seq<CapKey>, bound: nat, parent: CapKey, child: CapKey)
+requires
+    connected(map),
+    generation_bounded(map, bound),
+    map.contains_key(parent),
+    keys.to_set().subset_of(map.dom()),
+    transitive_children(map, keys, bound).contains(parent),
+    map[parent].children.contains(child)
+ensures
+    transitive_children(map, keys, bound).contains(child)
+{
+    let new_keys = direct_children(map, keys);
+
+    if keys.contains(parent) {
+        lemma_direct_children_complete(map, keys, parent, child);
+        assert(new_keys.contains(child));
+        assert(new_keys.len() > 0);
+
+        assume(new_keys.to_set().subset_of(map.dom()));
+        assert(new_keys.is_prefix_of(transitive_children(map, new_keys, bound)));
+
+        assert(transitive_children(map, new_keys, bound).contains(child));
+        assert(transitive_children(map, new_keys, bound).is_suffix_of(transitive_children(map, keys, bound)));
+    }
+    else {
+        admit()
+    }
+}
+
+pub open spec fn parent_child(map: CapMap) -> bool {
+    forall |key: CapKey| map.contains_key(key) && map[key].parent.is_some()
+    ==> {
+        &&& #[trigger] map.contains_key(map[key].parent.unwrap())
+        &&& map[map[key].parent.unwrap()].children.contains(key)
+    }
+}
+
+pub open spec fn revoke_children(map: CapMap, parent: CapKey, bound: nat) -> CapMap {
+    map
+        .insert(parent, CapNode { children: Seq::empty(), ..map[parent] })
+        .remove_keys(transitive_children(map, map[parent].children, bound).to_set())
 }
 
 state_machine!{
@@ -328,11 +397,7 @@ state_machine!{
 
         #[invariant]
         pub fn parent_child(&self) -> bool {
-            forall |key: CapKey| self.nodes.contains_key(key) && self.nodes[key].parent.is_some()
-            ==> {
-                &&& #[trigger] self.nodes.contains_key(self.nodes[key].parent.unwrap())
-                &&& self.nodes[self.nodes[key].parent.unwrap()].children.contains(key)
-            }
+            parent_child(self.nodes)
         }
 
         #[invariant]
@@ -401,16 +466,66 @@ state_machine!{
         transition!{
             revoke_children(parent: CapKey) {
                 require pre.nodes.contains_key(parent);
-                update nodes[parent] = CapNode { children: Seq::empty(), ..pre.nodes[parent] };
-                update nodes = pre.nodes.remove_keys(transitive_children(pre.nodes, pre.nodes[parent].children, pre.generation).to_set());
+                update nodes = revoke_children(pre.nodes, parent, pre.generation);
             }
         }
 
         #[inductive(revoke_children)]
         fn revoke_children_inductive(pre: Self, post: Self, parent: CapKey) {
-            admit()
+            revoke_inv_connected(pre.nodes, post.nodes, parent, post.generation);
+            revoke_inv_parent_child(pre.nodes, post.nodes, parent, post.generation);
         }
     }
+}
+
+proof fn revoke_inv_connected(pre: CapMap, post: CapMap, parent: CapKey, bound: nat)
+requires
+    connected(pre),
+    pre.contains_key(parent),
+    generation_bounded(pre, bound),
+    generation_bounded(post, bound),
+    post == revoke_children(pre, parent, bound),
+ensures connected(post)
+{
+    admit()
+}
+
+proof fn revoke_inv_parent_child(pre: CapMap, post: CapMap, parent: CapKey, bound: nat)
+requires
+    connected(pre),
+    parent_child(pre),
+    generation_bounded(pre, bound),
+    pre.contains_key(parent),
+    post == revoke_children(pre, parent, bound),
+ensures parent_child(post)
+{
+    assert forall |key: CapKey| post.contains_key(key) && post[key].parent.is_some()
+    implies {
+        &&& #[trigger] post.contains_key(post[key].parent.unwrap())
+        &&& post[post[key].parent.unwrap()].children.contains(key)
+    }
+    by {
+        let current_parent = pre[key].parent.unwrap();
+        assert(current_parent == post[key].parent.unwrap());
+
+        assert(pre.contains_key(current_parent));
+        assert(pre[current_parent].children.contains(key));
+
+        if current_parent == parent {
+            assert(pre[parent].children.contains(key));
+            assert(pre[parent].children.len() > 0);
+            assert(pre[parent].children.is_prefix_of(transitive_children(pre, pre[parent].children, bound)));
+            assert(transitive_children(pre, pre[parent].children, bound).contains(key));
+        }
+        else if transitive_children(pre, pre[parent].children, bound).contains(current_parent) {
+            lemma_transitive_children_complete(pre, pre[parent].children, bound, current_parent, key);
+            assert(transitive_children(pre, pre[parent].children, bound).contains(key));
+        }
+        else {
+            assert(post.contains_key(current_parent));
+            assert(post[current_parent] == pre[current_parent]);
+        }
+    };
 }
 
 fn test() {
