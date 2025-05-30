@@ -29,146 +29,6 @@ pub open spec fn generation_bounded(map: CapMap, bound: nat) -> bool {
     forall |key: CapKey| map.contains_key(key) ==> #[trigger] map[key].generation < bound
 }
 
-#[cfg(disable)]
-mod useless {
-ghost struct GenerationMap {
-    map: Map<CapKey, nat>,
-    bound: nat,
-}
-
-impl GenerationMap {
-    spec fn bounded(self) -> bool {
-        forall |key: CapKey| self.map.contains_key(key) ==> #[trigger] self.map[key] < self.bound
-    }
-
-    spec fn increasing(self, relations: ChildrenMap) -> bool {
-        forall |key: CapKey| relations.contains_key(key)
-        ==> forall |index: int| 0 <= index < relations[key].1.len()
-        ==> self.map[key] < #[trigger] self.map[relations[key].1[index]]
-    }
-}
-
-type ChildrenMap = Map<CapKey, (Option<CapKey>, Seq<CapKey>)>;
-
-spec fn remove_nodes_rec(map: ChildrenMap, keys: Seq<CapKey>, parent: CapKey, gens: GenerationMap) -> (ChildrenMap, Set<CapKey>)
-decreases gens.bound - gens.map[parent], keys.len()
-    when
-        gens.bounded()
-        && gens.increasing(map)
-        && map.contains_key(parent)
-        && (keys.len() == 0 || map.contains_key(keys.last()))
-        && gens.map.contains_key(parent)
-        && (keys.len() == 0 || gens.map.contains_key(keys.last()))
-        && keys.is_prefix_of(map[parent].1)
-{
-    if keys.len() == 0 {
-        (map, Set::empty())
-    }
-    else {
-        // remove all children of keys.last()
-        let (updated, children) = remove_nodes_rec(map, map[keys.last()].1, keys.last(), gens);
-
-        // remove all neighbours of keys.last()
-        let (updated, neighbours) = remove_nodes_rec(updated, keys.drop_last(), parent, gens);
-
-        // remove keys.last()
-        (updated.remove(keys.last()), children.union(neighbours).insert(keys.last()))
-    }
-}
-
-spec fn remove_children(maps: (ChildrenMap, GenerationMap), key: CapKey) -> (ChildrenMap, Set<CapKey>)
-{
-    remove_nodes_rec(maps.0, maps.0[key].1, key, maps.1)
-}
-
-spec fn connected(map: ChildrenMap) -> bool {
-    forall |key: CapKey, index: int| map.contains_key(key) && 0 <= index < map[key].1.len()
-    ==> #[trigger] map.contains_key(map[key].1[index]) && map[map[key].1[index]].0 == Some(key)
-}
-
-spec fn almost_connected(map: ChildrenMap, exception: CapKey) -> bool {
-    forall |key: CapKey, index: int| map.contains_key(key) && 0 <= index < map[key].1.len() && key != exception
-    ==> #[trigger] map.contains_key(map[key].1[index]) && map[map[key].1[index]].0 == Some(key)
-}
-
-proof fn lemma_remove_nodes_disjoint(map: ChildrenMap, keys: Seq<CapKey>, parent: CapKey, gens: GenerationMap)
-requires
-    almost_connected(map, parent),
-    map.dom().subset_of(gens.map.dom()),
-    gens.bounded(),
-    gens.increasing(map),
-    keys.is_prefix_of(map[parent].1),
-    map.contains_key(parent),
-ensures
-    ({
-        let (updated, deleted) = remove_nodes_rec(map, keys, parent, gens); {
-            &&& almost_connected(map, parent)
-            &&& updated.dom().disjoint(deleted)
-            &&& map.dom() == updated.dom().union(deleted)
-            &&& updated.submap_of(map)
-            &&& forall |key: CapKey| deleted.contains(key) ==> #[trigger] gens.map[key] > gens.map[parent]
-            &&& keys.to_set().subset_of(deleted)
-            &&& gens.increasing(updated)
-        }
-    })
-decreases gens.bound - gens.map[parent], keys.len()
-{
-    if keys.len() == 0 {
-        let (updated, deleted) = remove_nodes_rec(map, keys, parent, gens);
-        assert(keys == Seq::<CapKey>::empty());
-        assert(updated == map);
-        assert(deleted == Set::<CapKey>::empty());
-        assert(updated.dom().union(deleted) == map.dom());
-        assert(updated.submap_of(map));
-    }
-    else {
-        lemma_remove_nodes_disjoint(map, map[keys.last()].1, keys.last(), gens);
-        let (fst_updated, fst_deleted) = remove_nodes_rec(map, map[keys.last()].1, keys.last(), gens);
-
-        assert(fst_updated.submap_of(map));
-
-        lemma_remove_nodes_disjoint(fst_updated, keys.drop_last(), parent, gens);
-        let (snd_updated, snd_deleted) = remove_nodes_rec(fst_updated, keys.drop_last(), parent, gens);
-
-        assert(connected(snd_updated));
-        assert(snd_updated.submap_of(fst_updated));
-        lemma_submap_of_trans(snd_updated, fst_updated, map);
-
-        let result = snd_updated.remove(keys.last());
-        let deleted = fst_deleted.union(snd_deleted).insert(keys.last());
-
-        assert(result.dom().disjoint(deleted.insert(keys.last())));
-        assert(map.dom() == result.dom().union(deleted));
-        assert(result.submap_of(snd_updated));
-        lemma_submap_of_trans(result, snd_updated, map);
-
-        assert forall |key: CapKey| deleted.contains(key) ==> #[trigger] gens.map[key] > gens.map[parent]
-        by {};
-
-        assert forall |key: CapKey, index: int| result.contains_key(key) && 0 <= index < result[key].1.len() && key != parent
-        implies #[trigger] result.contains_key(result[key].1[index]) && result[result[key].1[index]].0 == Some(key)
-        by {
-            assert(map.contains_key(result[key].1[index]));
-
-            if snd_updated.contains_key(result[key].1[index]) {
-                if result[key].1[index] == keys.last() {
-                    assert(map.contains_key(key));
-                    assert(result[key] == map[key]);
-                    assert(keys.is_prefix_of(map[parent].1));
-                    assert(keys[keys.len() - 1] == map[parent].1[keys.len() - 1]);
-                    assert(map.contains_key(map[parent].1[keys.len() - 1]));
-                    assert(map[key].0 == Some(parent));
-                }
-                else {}
-            }
-            else {
-                assert(!result.contains_key(key));
-            }
-        };
-    }
-}
-}
-
 pub open spec fn direct_children(map: CapMap, keys: Seq<CapKey>) -> Seq<CapKey>
 {
     keys.map_values(|key| map[key].children).flatten()
@@ -380,6 +240,32 @@ ensures
     lemma_flatten_index2(keys.map_values(children), parent_index, child_offset);
 }
 
+proof fn lemma_direct_children_co_complete(map: CapMap, keys: Seq<CapKey>, child: CapKey)
+requires
+    map.contains_key(child),
+    child_parent(map),
+    keys.to_set().subset_of(map.dom()),
+    map[child].parent.is_some(),
+    direct_children(map, keys).contains(child),
+ensures
+    keys.contains(map[child].parent.unwrap()),
+{
+    let that_index = choose |index: int|
+        0 <= index < direct_children(map, keys).len() &&
+        direct_children(map, keys)[index] == child;
+
+    let get_children = |key: CapKey| map[key].children;
+    let unflat = keys.map_values(get_children);
+    lemma_flatten_index(unflat, that_index);
+
+    let (origin, offset) = choose |origin: int, offset: int|
+        0 <= origin < unflat.len() && 0 <= offset < unflat[origin].len() &&
+        unflat[origin][offset] == unflat.flatten()[that_index];
+
+    assert(map[keys[origin]].children[offset] == child);
+    assert(map[child].parent == Some(keys[origin]));
+}
+
 proof fn lemma_transitive_children_rec(map: CapMap, keys: Seq<CapKey>, bound: nat)
 requires
     connected(map),
@@ -456,11 +342,56 @@ decreases bound - keys.map_values(|key| map[key].generation as int).min()
     }
 }
 
+proof fn lemma_transitive_children_co_complete(map: CapMap, keys: Seq<CapKey>, bound: nat, child: CapKey)
+requires
+    connected(map),
+    generation_bounded(map, bound),
+    child_parent(map),
+
+    transitive_children(map, keys, bound).contains(child),
+    keys.to_set().subset_of(map.dom()),
+    map.contains_key(child),
+    !keys.contains(child),
+    map[child].parent.is_some(),
+
+ensures
+    transitive_children(map, keys, bound).contains(map[child].parent.unwrap()),
+
+decreases bound - keys.map_values(|key| map[key].generation as int).min()
+{
+    let parent = map[child].parent.unwrap();
+    let rec_call = transitive_children(map, direct_children(map, keys), bound);
+    lemma_transitive_children_rec(map, keys, bound);
+
+    lemma_direct_children_closed(map, keys);
+    assert(transitive_children(map, direct_children(map, keys), bound).contains(child));
+
+    if direct_children(map, keys).contains(child) {
+        lemma_direct_children_co_complete(map, keys, child);
+        let index = choose |index: int| 0 <= index < keys.len() && keys[index] == parent;
+        axiom_seq_add_index1(keys, rec_call, index);
+    }
+    else {
+        lemma_transitive_children_decreases(map, keys, bound);
+        lemma_transitive_children_co_complete(map, direct_children(map, keys), bound, child);
+        let index = choose |index: int| 0 <= index < rec_call.len() && rec_call[index] == parent;
+        axiom_seq_add_index2(keys, rec_call, index + keys.len());
+    }
+}
+
 pub open spec fn parent_child(map: CapMap) -> bool {
     forall |key: CapKey| map.contains_key(key) && map[key].parent.is_some()
     ==> {
         &&& #[trigger] map.contains_key(map[key].parent.unwrap())
         &&& map[map[key].parent.unwrap()].children.contains(key)
+    }
+}
+
+pub open spec fn child_parent(map: CapMap) -> bool {
+    forall |key: CapKey, index: int| map.contains_key(key) && 0 <= index < map[key].children.len()
+    ==> {
+        &&& map.contains_key(map[key].children[index])
+        &&& #[trigger] map[map[key].children[index]].parent == Some(key)
     }
 }
 
@@ -499,11 +430,7 @@ state_machine!{
 
         #[invariant]
         pub fn child_parent(&self) -> bool {
-            forall |key: CapKey, index: int| self.nodes.contains_key(key) && 0 <= index < self.nodes[key].children.len()
-            ==> {
-                &&& self.nodes.contains_key(self.nodes[key].children[index])
-                &&& #[trigger] self.nodes[self.nodes[key].children[index]].parent == Some(key)
-            }
+            child_parent(self.nodes)
         }
 
         init!{
@@ -578,13 +505,44 @@ state_machine!{
 proof fn revoke_inv_connected(pre: CapMap, post: CapMap, parent: CapKey, bound: nat)
 requires
     connected(pre),
+    child_parent(pre),
     pre.contains_key(parent),
     generation_bounded(pre, bound),
     generation_bounded(post, bound),
     post == revoke_children(pre, parent, bound),
 ensures connected(post)
 {
-    admit()
+    assert forall |key: CapKey, index: int|
+        post.contains_key(key) && 0 <= index < post[key].children.len()
+
+    implies {
+        &&& post.contains_key(#[trigger] post[key].children[index])
+        &&& post[key].generation < post[post[key].children[index]].generation
+    }
+
+    by {
+        if key == parent {
+            // this has no children
+        }
+        else if transitive_children(pre, pre[parent].children, bound).contains(key) {
+            // keys were removed
+        }
+        else {
+            // prove that children were not removed
+            let child = post[key].children[index];
+
+            if transitive_children(pre, pre[parent].children, bound).contains(child) {
+                assert(pre[child].parent.unwrap() == key);
+
+                if pre[parent].children.contains(child) {}
+                else {
+                    lemma_transitive_children_co_complete(pre, pre[parent].children, bound, child);
+                    assert(transitive_children(pre, pre[parent].children, bound).contains(key));
+                }
+            }
+            else { }
+        }
+    };
 }
 
 proof fn revoke_inv_parent_child(pre: CapMap, post: CapMap, parent: CapKey, bound: nat)
