@@ -1,9 +1,7 @@
 use state_machines_macros::state_machine;
 use vstd::{
-    atomic::PermissionIsize,
     prelude::*,
     seq::{axiom_seq_add_index1, axiom_seq_add_index2, axiom_seq_new_index},
-    seq_lib::lemma_seq_contains,
 };
 
 verus! {
@@ -176,8 +174,11 @@ pub open spec fn direct_children(map: CapMap, keys: Seq<CapKey>) -> Seq<CapKey>
     keys.map_values(|key| map[key].children).flatten()
 }
 
-proof fn direct_children_inc_gen(map: CapMap, keys: Seq<CapKey>)
-requires keys.to_set().subset_of(map.dom()) && map.dom().finite() && connected(map) && direct_children(map, keys).len() != 0
+proof fn lemma_direct_children_inc_gen(map: CapMap, keys: Seq<CapKey>)
+requires
+    keys.to_set().subset_of(map.dom()),
+    connected(map),
+    direct_children(map, keys).len() != 0
 ensures keys.map_values(|key| map[key].generation as int).min() < direct_children(map, keys).map_values(|key| map[key].generation as int).min()
 {
     let generation = |key| map[key].generation as int;
@@ -217,6 +218,33 @@ ensures keys.map_values(|key| map[key].generation as int).min() < direct_childre
     assert(map[keys[origin]].children[offset] == direct_children(map, keys)[min_child_index]);
 
     assert(generation(keys[origin]) < children[min_child_index]);
+}
+
+proof fn lemma_direct_children_closed(map: CapMap, keys: Seq<CapKey>)
+requires
+    keys.to_set().subset_of(map.dom()),
+    connected(map)
+ensures
+    direct_children(map, keys).to_set().subset_of(map.dom())
+{
+    assert forall |key: CapKey| direct_children(map, keys).contains(key)
+    implies map.dom().contains(key)
+    by {
+        let that_index = choose |index: int|
+            0 <= index < direct_children(map, keys).len() &&
+            direct_children(map, keys)[index] == key;
+
+        let children = |key: CapKey| map[key].children;
+        let unflat = keys.map_values(children);
+        lemma_flatten_index(unflat, that_index);
+
+        let (origin, offset) = choose |origin: int, offset: int|
+            0 <= origin < unflat.len() && 0 <= offset < unflat[origin].len() &&
+            unflat[origin][offset] == unflat.flatten()[that_index];
+
+        assert(map.contains_key(keys[origin]));
+        assert(map.contains_key(map[keys[origin]].children[offset]));
+    }
 }
 
 proof fn lemma_flatten_index<A>(arg: Seq<Seq<A>>, index: int)
@@ -261,41 +289,57 @@ decreases arg.len()
     }
 }
 
-#[via_fn]
-proof fn transitive_children_decreases(map: CapMap, keys: Seq<CapKey>, bound: nat)
+proof fn lemma_transitive_children_decreases(map: CapMap, keys: Seq<CapKey>, bound: nat)
+requires
+    connected(map),
+    generation_bounded(map, bound),
+    keys.to_set().subset_of(map.dom()),
+    direct_children(map, keys).len() != 0
+ensures
+    bound - keys.map_values(|key| map[key].generation as int).min() >
+    bound - direct_children(map, keys).map_values(|key| map[key].generation as int).min()
 {
-    if direct_children(map, keys).len() == 0 { }
+    lemma_direct_children_inc_gen(map, keys);
+
+    let generation = |key: CapKey| map[key].generation as int;
+    let children = |key: CapKey| map[key].children;
+    let new_gens = direct_children(map, keys).map_values(generation);
+
+    new_gens.min_ensures();
+    assert(exists |i: int| new_gens.len() > i && new_gens[i] == new_gens.min());
+    let that_index = choose |i: int| 0 <= i < new_gens.len() && new_gens[i] == new_gens.min();
+
+    assert(that_index < direct_children(map, keys).len() == direct_children(map, keys).map_values(generation).len());
+    axiom_seq_new_index(direct_children(map, keys).len(), |i| generation(direct_children(map, keys)[i]), that_index);
+
+    assert(direct_children(map, keys).map_values(generation)[that_index] == generation(direct_children(map, keys)[that_index]));
+    let that_key = direct_children(map, keys)[that_index];
+
+    let unflat = keys.map_values(children);
+    lemma_flatten_index(unflat, that_index);
+
+    let (origin, offset) = choose |origin: int, offset: int|
+        0 <= origin < unflat.len() && 0 <= offset < unflat[origin].len() &&
+        unflat[origin][offset] == unflat.flatten()[that_index];
+
+    assert(map.contains_key(keys[origin]));
+    assert(map.contains_key(map[keys[origin]].children[offset]));
+
+    axiom_seq_new_index(keys.len(), |i| children(keys[i]), origin);
+    assert(map[keys[origin]].children[offset] == keys.map_values(children)[origin][offset]);
+
+    assert(map.contains_key(that_key));
+
+    assert(0 <= new_gens.min() < bound);
+}
+
+#[via_fn]
+proof fn transitive_children_decreases_via(map: CapMap, keys: Seq<CapKey>, bound: nat)
+{
+    if direct_children(map, keys).len() == 0 {}
     else {
-        direct_children_inc_gen(map, keys);
-
-        let generation = |key: CapKey| map[key].generation as int;
-        let children = |key: CapKey| map[key].children;
-        let new_gens = direct_children(map, keys).map_values(generation);
-
-        new_gens.min_ensures();
-        assert(exists |i: int| new_gens.len() > i && new_gens[i] == new_gens.min());
-        let that_index = choose |i: int| new_gens.len() > i && new_gens[i] == new_gens.min();
-        assert(that_index < direct_children(map, keys).len() == direct_children(map, keys).map_values(generation).len());
-        axiom_seq_new_index(direct_children(map, keys).len(), |i| generation(direct_children(map, keys)[i]), that_index);
-        assert(direct_children(map, keys).map_values(generation)[that_index] == generation(direct_children(map, keys)[that_index]));
-        let that_key = direct_children(map, keys)[that_index];
-
-        let unflat = keys.map_values(children);
-        lemma_flatten_index(unflat, that_index);
-
-        let (origin, offset) = choose |origin: int, offset: int|
-            0 <= origin < unflat.len() && 0 <= offset < unflat[origin].len() &&
-            unflat[origin][offset] == unflat.flatten()[that_index];
-
-        assert(map.contains_key(keys[origin]));
-        assert(map.contains_key(map[keys[origin]].children[offset]));
-
-        axiom_seq_new_index(keys.len(), |i| children(keys[i]), origin);
-        assert(map[keys[origin]].children[offset] == keys.map_values(children)[origin][offset]);
-
-        assert(map.contains_key(that_key));
-
-        assert(new_gens.min() < bound);
+        lemma_direct_children_closed(map, keys);
+        lemma_transitive_children_decreases(map, keys, bound);
     }
 }
 
@@ -313,7 +357,7 @@ decreases bound - keys.map_values(|key| map[key].generation as int).min()
     when keys.to_set().subset_of(map.dom())
         && connected(map)
         && generation_bounded(map, bound)
-    via transitive_children_decreases
+    via transitive_children_decreases_via
 {
     let new_keys = direct_children(map, keys);
 
@@ -336,16 +380,34 @@ ensures
     lemma_flatten_index2(keys.map_values(children), parent_index, child_offset);
 }
 
+proof fn lemma_transitive_children_rec(map: CapMap, keys: Seq<CapKey>, bound: nat)
+requires
+    connected(map),
+    generation_bounded(map, bound),
+    keys.to_set().subset_of(map.dom()),
+ensures
+    transitive_children(map, keys, bound) == keys + transitive_children(map, direct_children(map, keys), bound)
+{
+    if direct_children(map, keys).len() == 0 {
+        assert(transitive_children(map, keys, bound) == keys);
+        assert(transitive_children(map, direct_children(map, keys), bound).len() == 0);
+    }
+    else {
+        lemma_direct_children_closed(map, keys);
+    }
+}
+
 proof fn lemma_transitive_children_complete(map: CapMap, keys: Seq<CapKey>, bound: nat, parent: CapKey, child: CapKey)
 requires
     connected(map),
     generation_bounded(map, bound),
-    map.contains_key(parent),
     keys.to_set().subset_of(map.dom()),
+    map.contains_key(parent),
     transitive_children(map, keys, bound).contains(parent),
     map[parent].children.contains(child)
 ensures
     transitive_children(map, keys, bound).contains(child)
+decreases bound - keys.map_values(|key| map[key].generation as int).min()
 {
     let new_keys = direct_children(map, keys);
 
@@ -354,14 +416,43 @@ ensures
         assert(new_keys.contains(child));
         assert(new_keys.len() > 0);
 
-        assume(new_keys.to_set().subset_of(map.dom()));
+        lemma_direct_children_closed(map, keys);
         assert(new_keys.is_prefix_of(transitive_children(map, new_keys, bound)));
 
         assert(transitive_children(map, new_keys, bound).contains(child));
         assert(transitive_children(map, new_keys, bound).is_suffix_of(transitive_children(map, keys, bound)));
     }
     else {
-        admit()
+        let parent_index = choose |index: int|
+            0 <= index < transitive_children(map, keys, bound).len() &&
+            transitive_children(map, keys, bound)[index] == parent;
+
+        lemma_transitive_children_rec(map, keys, bound);
+
+        if parent_index < keys.len() {
+            axiom_seq_add_index1(keys, transitive_children(map, new_keys, bound), parent_index);
+        }
+        else {
+            axiom_seq_add_index2(keys, transitive_children(map, new_keys, bound), parent_index);
+            assert(transitive_children(map, new_keys, bound).contains(parent));
+
+            if new_keys.len() == 0 {
+                assert(transitive_children(map, keys, bound) == keys);
+            }
+            else {
+                lemma_direct_children_closed(map, keys);
+                lemma_transitive_children_decreases(map, keys, bound);
+                lemma_transitive_children_complete(map, new_keys, bound, parent, child);
+                assert(transitive_children(map, new_keys, bound).contains(child));
+
+                let child_index = choose |index: int|
+                    0 <= index < transitive_children(map, new_keys, bound).len() &&
+                    transitive_children(map, new_keys, bound)[index] == child;
+
+                axiom_seq_add_index2(keys, transitive_children(map, new_keys, bound), keys.len() + child_index);
+                assert(transitive_children(map, keys, bound).contains(child));
+            }
+        }
     }
 }
 
