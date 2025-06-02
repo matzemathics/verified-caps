@@ -88,7 +88,7 @@ ensures
     direct_children(map, keys).to_set().subset_of(map.dom())
 {
     assert forall |key: CapKey| direct_children(map, keys).contains(key)
-    implies map.dom().contains(key)
+    implies  #[trigger] map.dom().contains(key)
     by {
         let that_index = choose |index: int|
             0 <= index < direct_children(map, keys).len() &&
@@ -597,18 +597,13 @@ fn test() {
         assert(test.nodes[3].children == seq![4u64]);
         assert(test.nodes[4].children == Seq::<u64>::empty());
 
-        assert(direct_children(test.nodes, seq![2, 3]) == seq![4u64]) by (compute);
         assert(direct_children(test.nodes, seq![4]) == Seq::<u64>::empty()) by (compute);
-        assert(direct_children(test.nodes, seq![2]) == Seq::<u64>::empty()) by (compute);
-
-        reveal_with_fuel(remove_all, 20);
-
-        assert forall |v: u64| #[trigger] Seq::empty().remove_value(v) == Seq::<u64>::empty()
-        by { Seq::empty().index_of_first_ensures(v) };
-
-        reveal_with_fuel(transitive_children, 5);
         assert(transitive_children(test.nodes, seq![4], test.generation) == seq![4u64]);
+
+        assert(direct_children(test.nodes, seq![2]) == Seq::<u64>::empty()) by (compute);
         assert(transitive_children(test.nodes, seq![2], test.generation) == seq![2u64]);
+
+        assert(direct_children(test.nodes, seq![2, 3]) == seq![4u64]) by (compute);
         assert(transitive_children(test.nodes, seq![2, 3], test.generation) == seq![2u64, 3, 4]);
 
         test = CapState::take_step::revoke_children(test, 1);

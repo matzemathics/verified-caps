@@ -16,18 +16,23 @@
  * General Public License version 2 for more details.
  */
 
-
 use core::cmp::Ordering;
 use core::fmt;
 use core::mem::size_of;
 use core::num::Wrapping;
 use core::ptr::{read_volatile, NonNull};
 
+use vstd::prelude::*;
+use vstd::simple_pptr::PPtr;
+
 use crate::boxed::Box;
+use crate::nullable::Nullable;
+
+verus! {
 
 struct Node<K, V> {
-    left: Option<NonNull<Node<K, V>>>,
-    right: Option<NonNull<Node<K, V>>>,
+    left: Nullable<Node<K, V>>,
+    right: Nullable<Node<K, V>>,
     prio: Wrapping<u32>,
     key: K,
     value: V,
@@ -36,8 +41,8 @@ struct Node<K, V> {
 impl<K: Copy + Ord, V> Node<K, V> {
     fn new(key: K, value: V, prio: Wrapping<u32>) -> Self {
         Node {
-            left: None,
-            right: None,
+            left: Nullable::null(),
+            right: Nullable::null(),
             prio,
             key,
             value,
@@ -61,7 +66,7 @@ impl<K: Copy + Ord, V> Node<K, V> {
 /// The idea and parts of the implementation are taken from the [MMIX](http://mmix.cs.hm.edu/)
 /// simulator, written by Donald Knuth
 pub struct Treap<K: Copy + Ord, V> {
-    root: Option<NonNull<Node<K, V>>>,
+    root: Nullable<Node<K, V>>,
     prio: Wrapping<u32>,
 }
 
@@ -69,48 +74,48 @@ impl<K: Copy + Ord, V> Treap<K, V> {
     /// Creates an empty treap
     pub const fn new() -> Self {
         Treap {
-            root: None,
+            root: Nullable::null(),
             prio: Wrapping(314_159_265),
         }
     }
 
     /// Returns true if the treap has no elements
     pub fn is_empty(&self) -> bool {
-        self.root.is_none()
+        self.root.is_null()
     }
 
     /// Removes all elements from the treap
     pub fn clear(&mut self) {
-        if let Some(r) = self.root.take() {
+        if let Some(r) = self.root.take_inner() {
             Self::remove_rec(r);
-            // destroy the node
-            unsafe { drop(Box::from_raw(r.as_ptr())) };
         }
 
         self.prio = Wrapping(314_159_265);
     }
 
-    fn do_search<'a, F>(node: &'a Option<NonNull<Node<K, V>>>, f: &F) -> Option<&'a V>
+    fn do_search<'a, F>(node: &'a Nullable<Node<K, V>>, f: &F) -> Option<&'a V>
     where
         F: Fn(&V) -> bool,
     {
-        unsafe {
-            if let Some(valid_node) = node {
-                if let Some(matched_value) = Self::do_search(&valid_node.as_ref().left, f) {
-                    return Some(matched_value);
-                }
-                if f(&valid_node.as_ref().value) {
-                    return Some(&valid_node.as_ref().value);
-                }
-                if let Some(matched_value) = Self::do_search(&valid_node.as_ref().right, f) {
-                    return Some(matched_value);
-                }
-                None
-            }
-            else {
-                None
-            }
+        if node.is_null() {
+            return None
         }
+
+        let valid_node = node.read();
+
+        if let Some(matched_value) = Self::do_search(&valid_node.left, f) {
+            return Some(matched_value);
+        }
+
+        if f(&valid_node.value) {
+            return Some(&valid_node.value);
+        }
+
+        if let Some(matched_value) = Self::do_search(&valid_node.right, f) {
+            return Some(matched_value);
+        }
+
+        None
     }
 
     pub fn find<F>(&self, f: F) -> Option<&V>
@@ -120,52 +125,35 @@ impl<K: Copy + Ord, V> Treap<K, V> {
         Self::do_search(&self.root, &f)
     }
 
-    fn remove_rec(node: NonNull<Node<K, V>>) {
+    fn remove_rec(mut node: Node<K, V>) {
         unsafe {
-            if let Some(l) = (*node.as_ptr()).left {
+            if let Some(l) = node.left.take_inner() {
                 Self::remove_rec(l);
-                drop(Box::from_raw(l.as_ptr()));
             }
-            if let Some(r) = (*node.as_ptr()).right {
+            if let Some(r) = node.right.take_inner() {
                 Self::remove_rec(r);
-                drop(Box::from_raw(r.as_ptr()));
             }
         }
     }
 
     /// Returns a reference to the value for the given key
     pub fn get(&self, key: &K) -> Option<&V> {
-        self.get_node(key).map(|n| unsafe { &(*n.as_ptr()).value })
+        self.get_node(key).map(|n| &n.value)
     }
 
-    /// Returns a mutable reference to the value for the given key
-    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-        self.get_node(key)
-            .map(|n| unsafe { &mut (*n.as_ptr()).value })
-    }
+    fn get_node<'a>(&'a self, key: &K) -> Option<&'a Node<K, V>>
+    {
+        let mut node = &self.root;
 
-    /// Returns a mutable reference to the root value
-    pub fn get_root_mut(&mut self) -> Option<&mut V> {
-        unsafe {
-            // FIXME the read_volatile seems to be necessary to convince the compiler to re-extract
-            // the root element every time and not just once (see CapTable::revoke_all).
-            // looks like a compiler bug
-            read_volatile(&self.root).map(|r| &mut (*r.as_ptr()).value)
-        }
-    }
-
-    fn get_node(&self, key: &K) -> Option<NonNull<Node<K, V>>> {
-        let mut node = self.root;
         loop {
-            match node {
-                Some(n) => unsafe {
-                    match key.cmp(&(*n.as_ptr()).key) {
-                        Ordering::Less => node = (*n.as_ptr()).left,
-                        Ordering::Greater => node = (*n.as_ptr()).right,
-                        Ordering::Equal => return Some(n),
-                    }
-                },
-                None => return None,
+            if node.is_null() {
+                return None;
+            }
+
+            match key.cmp(&node.read().key) {
+                Ordering::Less => node = &node.read().left,
+                Ordering::Greater => node = &node.read().right,
+                Ordering::Equal => return node.read_opt(),
             }
         }
     }
@@ -173,80 +161,76 @@ impl<K: Copy + Ord, V> Treap<K, V> {
     /// Inserts the given value for given key, assuming that the key does not exist in the tree and
     /// returns a mutable reference to the stored value
     #[inline(always)]
-    pub fn insert(&mut self, key: K, value: V) -> &mut V {
-        let node = Box::new(Node::new(key, value, self.prio));
+    pub fn insert(&mut self, key: K, value: V) {
+        let node = Node::new(key, value, self.prio);
         self.do_insert(node)
     }
 
-    fn do_insert(&mut self, mut node: Box<Node<K, V>>) -> &mut V {
-        unsafe {
-            let mut q = &mut self.root;
-            loop {
-                match *q {
-                    None => break,
-                    Some(n) if (*n.as_ptr()).prio >= self.prio => break,
-                    Some(n) => match node.key.cmp(&(*n.as_ptr()).key) {
-                        Ordering::Less => q = &mut (*n.as_ptr()).left,
-                        Ordering::Greater => q = &mut (*n.as_ptr()).right,
-                        Ordering::Equal => panic!("Key does already exist"),
-                    },
-                }
+    #[verifier::external_body]
+    fn do_insert(&mut self, mut node: Node<K, V>) {
+        let mut q = &mut self.root;
+        loop {
+            if q.is_null() { break; }
+
+            if q.read().prio >= self.prio { break }
+
+            match node.key.cmp(&q.read().key) {
+                Ordering::Less => q = &mut q.read().left,
+                Ordering::Greater => q = &mut q.read().right,
+                Ordering::Equal => panic!("Key does already exist"),
             }
-
-            let mut prev = *q;
-
-            {
-                // At this point we want to split the binary search tree p into two parts based on the
-                // given key, forming the left and right subtrees of the new node q. The effect will be
-                // as if key had been inserted before all of p’s nodes.
-                let mut l = &mut node.left;
-                let mut r = &mut node.right;
-                loop {
-                    match prev {
-                        None => break,
-                        Some(p) => match node.key.cmp(&(*p.as_ptr()).key) {
-                            Ordering::Less => {
-                                *r = Some(p);
-                                r = &mut (*p.as_ptr()).left;
-                                prev = *r;
-                            },
-                            Ordering::Greater => {
-                                *l = Some(p);
-                                l = &mut (*p.as_ptr()).right;
-                                prev = *l;
-                            },
-                            Ordering::Equal => panic!("Key does already exist"),
-                        },
-                    }
-                }
-                *l = None;
-                *r = None;
-            }
-
-            *q = Some(NonNull::from(Box::leak(node)));
-
-            // fibonacci hashing to spread the priorities very even in the 32-bit room
-            self.prio += Wrapping(0x9e37_79b9); // floor(2^32 / phi), with phi = golden ratio
-
-            &mut (*q.unwrap().as_ptr()).value
         }
+
+        let mut prev = *q;
+
+        {
+            // At this point we want to split the binary search tree p into two parts based on the
+            // given key, forming the left and right subtrees of the new node q. The effect will be
+            // as if key had been inserted before all of p’s nodes.
+            let mut l = &mut node.left;
+            let mut r = &mut node.right;
+
+            loop {
+                if prev.is_null() { break }
+
+                match node.key.cmp(&prev.read().key) {
+                    Ordering::Less => {
+                        *r = prev;
+                        r = &mut prev.read().left;
+                        prev = *r;
+                    }
+                    Ordering::Greater => {
+                        *l = prev;
+                        l = &mut prev.read().right;
+                        prev = *l;
+                    }
+                    Ordering::Equal => panic!("Key does already exist"),
+                }
+            }
+        }
+
+        *q = Nullable::new(node);
+
+        // fibonacci hashing to spread the priorities very even in the 32-bit room
+        self.prio += Wrapping(0x9e37_79b9); // floor(2^32 / phi), with phi = golden ratio
     }
 
     /// Sets the given key to given value, either by inserting a new node or by updating the value
     /// of the existing node. It returns a mutable reference to the stored value
+    #[cfg(later)]
     pub fn set(&mut self, key: K, value: V) -> &mut V {
         if let Some(n) = self.get_node(&key) {
             unsafe {
                 (*n.as_ptr()).value = value;
                 &mut (*n.as_ptr()).value
             }
-        }
-        else {
+        } else {
             self.insert(key, value)
         }
     }
 
     /// Removes the root element of the treap and returns the value
+    #[cfg(later)]
     pub fn remove_root(&mut self) -> Option<V> {
         self.root.map(|r| {
             Self::remove_from(&mut self.root, r);
@@ -255,57 +239,62 @@ impl<K: Copy + Ord, V> Treap<K, V> {
     }
 
     /// Removes the element from the treap for the given key and returns the value
+    #[verifier::external_body]
     pub fn remove(&mut self, key: &K) -> Option<V> {
         let mut p = &mut self.root;
+
         loop {
-            match *p {
-                Some(n) => unsafe {
-                    match key.cmp(&(*n.as_ptr()).key) {
-                        Ordering::Less => p = &mut (*n.as_ptr()).left,
-                        Ordering::Greater => p = &mut (*n.as_ptr()).right,
-                        Ordering::Equal => break,
-                    }
-                },
-                None => return None,
+            if p.is_null() { return None; }
+
+            match key.cmp(&p.read().key) {
+                Ordering::Less => p = &mut p.read().left,
+                Ordering::Greater => p = &mut p.read().right,
+                Ordering::Equal => break,
             }
         }
 
-        let node = (*p).unwrap();
-        Self::remove_from(p, node);
-        unsafe { Some(Box::from_raw(node.as_ptr()).into_value()) }
+        Self::remove_from(p);
+        Some(p.into_inner().unwrap().into_value())
     }
 
-    fn remove_from(p: &mut Option<NonNull<Node<K, V>>>, node: NonNull<Node<K, V>>) {
-        unsafe {
-            match ((*node.as_ptr()).left, (*node.as_ptr()).right) {
-                // two childs
-                (Some(l), Some(r)) => {
-                    // rotate with left
-                    if (*l.as_ptr()).prio < (*r.as_ptr()).prio {
-                        (*node.as_ptr()).left = (*l.as_ptr()).right;
-                        (*l.as_ptr()).right = Some(node);
-                        *p = Some(l);
-                        Self::remove_from(&mut (*l.as_ptr()).right, node);
-                    }
-                    // rotate with right
-                    else {
-                        (*node.as_ptr()).right = (*r.as_ptr()).left;
-                        (*r.as_ptr()).left = Some(node);
-                        *p = Some(r);
-                        Self::remove_from(&mut (*r.as_ptr()).left, node);
-                    }
-                },
-                // one child: replace us with our child
-                (Some(l), None) => {
-                    *p = Some(l);
-                },
-                (None, Some(r)) => {
-                    *p = Some(r);
-                },
-                // no child: simply remove us from parent
-                (None, None) => {
-                    *p = None;
-                },
+    #[verifier::external_body]
+    fn remove_from(p: &mut Nullable<Node<K, V>>) {
+        if p.is_null() { return; }
+        let (hole, mut node) = p.take().into_hole();
+
+        let (left, right) = (node.left.take(), node.right.take());
+
+        if left.is_null() {
+            *p = right;
+        }
+        else if right.is_null() {
+            *p = left;
+        }
+        else {
+            // rotate with left
+            if left.read().prio < right.read().prio {
+                let (left_hole, mut left) = left.into_hole();
+
+                node.left = left.right;
+                node.right = right;
+
+                left.right = hole.fill(node);
+                Self::remove_from(&mut left.right);
+
+                *p = left_hole.fill(left);
+            }
+
+            // rotate with right
+            else {
+                let (right_hole, mut right) = right.into_hole();
+
+                node.right = right.left;
+                node.left = left;
+
+                right.left = hole.fill(node);
+                Self::remove_from(&mut right.left);
+
+                *p = right_hole.fill(right);
             }
         }
     }
@@ -323,32 +312,33 @@ impl<K: Copy + Ord, V> Default for Treap<K, V> {
 }
 
 impl<K: Copy + Ord, V> Drop for Treap<K, V> {
-    fn drop(&mut self) {
+    #[verifier::external_body]
+    fn drop(&mut self)
+    opens_invariants none
+    no_unwind
+    {
         self.clear();
     }
 }
 
-fn print_rec<K, V>(node: NonNull<Node<K, V>>, f: &mut fmt::Formatter<'_>) -> fmt::Result
+fn print_rec<K, V>(node: &Node<K, V>, f: &mut fmt::Formatter<'_>) -> fmt::Result
 where
     K: Copy + Ord + fmt::Debug,
     V: fmt::Debug,
 {
-    let node_ptr = node.as_ptr();
-    unsafe {
-        writeln!(f, "  {:?} -> {:?}", (*node_ptr).key, (*node_ptr).value)?;
-        if let Some(l) = (*node_ptr).left {
-            print_rec(l, f)?;
-        }
-        if let Some(r) = (*node_ptr).right {
-            print_rec(r, f)?;
-        }
-        Ok(())
+    writeln!(f, "  {:?} -> {:?}", node.key, node.value)?;
+    if let Some(l) = node.left.read_opt() {
+        print_rec(l, f)?;
     }
+    if let Some(r) = node.right.read_opt() {
+        print_rec(r, f)?;
+    }
+    Ok(())
 }
 
 impl<K: Copy + Ord + fmt::Debug, V: fmt::Debug> fmt::Debug for Treap<K, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.root {
+        match self.root.read_opt() {
             Some(r) => print_rec(r, f),
             None => Ok(()),
         }
@@ -492,4 +482,6 @@ mod tests {
     fn test_alloc_size() {
         assert!(Treap::<(), ()>::alloc_size() > 0);
     }
+}
+
 }
