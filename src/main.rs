@@ -15,8 +15,7 @@ pub mod boxed {
 
 use vstd::prelude::*;
 
-#[cfg(disable)]
-mod linear;
+// mod linear;
 mod meta;
 mod nullable;
 mod ptr_map;
