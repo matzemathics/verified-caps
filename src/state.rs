@@ -2,7 +2,6 @@ use state_machines_macros::{state_machine, tokenized_state_machine};
 use vstd::{
     prelude::*,
     seq::{axiom_seq_add_index1, axiom_seq_add_index2, axiom_seq_new_index},
-    simple_pptr::{PPtr, PointsTo},
 };
 
 verus! {
@@ -665,7 +664,29 @@ pub open spec fn back_link_condition<T>(state: SysState, map: Map<CapKey, (T, Li
     }
 }
 
-tokenized_state_machine!(LinkSystem<T>{
+pub trait Token: Sized {
+    spec fn addr(&self) -> usize;
+
+    spec fn cond(&self, next: usize, child: usize, back: usize, first_child: bool) -> bool;
+}
+
+pub open spec fn token_invariant<T: Token>(map: Map<CapKey, (T, LinkedNode)>, key: CapKey) -> bool {
+    let next = if map[key].1.next.is_none() { 0 } else {
+        map[map[key].1.next.unwrap()].0.addr()
+    };
+
+    let child = if map[key].1.child.is_none() { 0 } else {
+        map[map[key].1.child.unwrap()].0.addr()
+    };
+
+    let back = if map[key].1.back.is_none() { 0 } else {
+        map[map[key].1.back.unwrap()].0.addr()
+    };
+
+    map[key].0.cond(next, child, back, map[key].1.first_child)
+}
+
+tokenized_state_machine!(LinkSystem<T: Token>{
     fields {
         #[sharding(variable)]
         pub map: Map<CapKey, (T, LinkedNode)>,
@@ -680,6 +701,12 @@ tokenized_state_machine!(LinkSystem<T>{
     #[invariant]
     pub fn state_tokens_disjoint(&self) -> bool {
         self.tokens.dom().disjoint(self.state.dom())
+    }
+
+    #[invariant]
+    pub fn token_invariant(&self) -> bool {
+        forall |key: CapKey| #[trigger] self.map.contains_key(key) ==>
+            token_invariant(self.map, key)
     }
 
     #[invariant]
@@ -738,8 +765,18 @@ tokenized_state_machine!(LinkSystem<T>{
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
     }
 
+    property!{
+        token_invariant(key: CapKey) {
+            assert(pre.map.contains_key(key) ==> token_invariant(pre.map, key));
+        }
+    }
+
     transition!{
         insert_first_child(t: T, key: CapKey, parent: CapKey) {
+            let inserted = LinkedNode { first_child: true, back: Some(parent), next: None, child: None };
+            let new_map = pre.map.insert(key, (t, inserted));
+
+            require token_invariant(new_map, key);
             require !pre.map.contains_key(key);
             require pre.map.contains_key(parent);
             require pre.map[parent].1.child.is_none();
@@ -749,11 +786,7 @@ tokenized_state_machine!(LinkSystem<T>{
             withdraw tokens -= [parent => pre.map[parent].0];
 
             update state = SysState::InsertFirst { inserted: key, parent };
-
-            let inserted = LinkedNode { first_child: true, back: Some(parent), next: None, child: None };
-
-            update map = pre.map
-                .insert(key, (t, inserted));
+            update map = new_map;
         }
     }
 
@@ -779,13 +812,16 @@ tokenized_state_machine!(LinkSystem<T>{
 
     transition! {
         finish_insert_first(p: T, inserted: CapKey, parent: CapKey) {
+            let (old, parent_node) = pre.map[parent];
+            let new_map = pre.map.insert(parent, (p, LinkedNode { child: Some(inserted), ..parent_node }));
+
+            require p.addr() == old.addr();
+            require token_invariant(new_map, parent);
             require pre.state == SysState::InsertFirst { inserted, parent };
 
             deposit tokens += [parent => p];
             update state = SysState::Clean;
-
-            let parent_node = pre.map[parent].1;
-            update map = pre.map.insert(parent, (p, LinkedNode { child: Some(inserted), ..parent_node }));
+            update map = new_map;
         }
     }
 
