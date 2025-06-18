@@ -1,3 +1,5 @@
+use core::borrow::Borrow;
+
 use vstd::{
     hash_map::HashMapWithView,
     prelude::*,
@@ -18,6 +20,12 @@ struct Node {
 impl Token for PointsTo<Node> {
     closed spec fn addr(&self) -> usize {
         self.pptr().addr()
+    }
+
+    proof fn is_nonnull(tracked &self)
+    ensures self.addr() != 0
+    {
+        self.is_nonnull()
     }
 
     closed spec fn cond(&self, next: usize, child: usize, back: usize, first_child: bool) -> bool {
@@ -47,6 +55,12 @@ impl Meta {
         old(self).spec@.instance_id() == old(self).instance@.id(),
         old(self).state@.instance_id() == old(self).instance@.id(),
     {
+        proof!{
+            // needed later to show parent.next != child && parent.back != child
+            self.instance.borrow().contains_back(parent, self.spec.borrow());
+            self.instance.borrow().contains_next(parent, self.spec.borrow());
+        };
+
         let parent_ptr = self.map.get(&parent).unwrap();
 
         let node = Node {
@@ -60,8 +74,7 @@ impl Meta {
         self.map.insert(child, ptr);
 
         proof!{
-            assume(self.spec@.value()[parent].1.child == Option::<CapKey>::None);
-
+            token.is_nonnull();
             let inserted = LinkedNode { first_child: true, back: Some(parent), next: None, child: None };
             let new_map = self.spec@.value().insert(child, (token, inserted));
 
@@ -69,6 +82,7 @@ impl Meta {
             assert(token_invariant(new_map, child));
 
             self.instance.borrow().token_invariant(parent, self.spec.borrow());
+            assert(token_invariant(self.spec@.value(), parent));
         };
 
         let tracked parent_token = self.instance.borrow_mut().insert_first_child(
@@ -78,18 +92,30 @@ impl Meta {
         assert(parent_ptr.addr() == parent_token.addr());
 
         let mut parent_node = parent_ptr.take(Tracked(&mut parent_token));
+
+        if parent_node.child == 0 {
+            proof!{
+                let child_key = self.spec@.value()[parent].1.child;
+                if child_key.is_some() {
+                    self.instance.borrow().token_invariant(parent, self.spec.borrow());
+                    self.instance.borrow().contains_child(parent, child_key.unwrap(), self.spec.borrow());
+                    self.instance.borrow().addr_nonnull(child_key.unwrap(), self.spec.borrow());
+                    assert(parent_node.child != 0);
+                }
+            }
+        }
+        else {
+            proof!{ admit(); };
+        }
+
         parent_node.child = ptr.addr();
         parent_ptr.put(Tracked(&mut parent_token), parent_node);
 
         proof! {
             let (_, old_parent_node) = self.spec@.value()[parent];
+
             let new_map = self.spec@.value()
                 .insert(parent, (parent_token, LinkedNode { child: Some(child), ..old_parent_node }));
-
-            assume(old_parent_node.next != Some(parent));
-            assume(old_parent_node.next != Some(child));
-            assume(old_parent_node.back != Some(parent));
-            assume(old_parent_node.back != Some(child));
 
             assert(token_invariant(new_map, parent));
 

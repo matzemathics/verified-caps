@@ -627,7 +627,8 @@ pub ghost struct LinkedNode {
 pub enum SysState {
     Clean,
     InsertFirst { inserted: CapKey, parent: CapKey },
-    InsertNext { inserted: CapKey, parent: CapKey, child: CapKey }
+    InsertNext { inserted: CapKey, parent: CapKey, child: CapKey },
+    InsertFinish { inserted: CapKey, parent: CapKey },
 }
 
 impl SysState {
@@ -635,6 +636,7 @@ impl SysState {
         match self {
             SysState::Clean => Set::empty(),
             SysState::InsertFirst { inserted, parent } => set![parent],
+            SysState::InsertFinish { inserted, parent } => set![parent],
             SysState::InsertNext { inserted, parent, child } => set![parent, child],
         }
     }
@@ -643,6 +645,7 @@ impl SysState {
         match self {
             SysState::Clean => false,
             SysState::InsertFirst { inserted, parent } => key == inserted,
+            SysState::InsertFinish { inserted, parent } => key == inserted,
             SysState::InsertNext { inserted, parent, child } => key == inserted,
         }
     }
@@ -666,6 +669,9 @@ pub open spec fn back_link_condition<T>(state: SysState, map: Map<CapKey, (T, Li
 
 pub trait Token: Sized {
     spec fn addr(&self) -> usize;
+
+    proof fn is_nonnull(tracked &self)
+    ensures self.addr() != 0;
 
     spec fn cond(&self, next: usize, child: usize, back: usize, first_child: bool) -> bool;
 }
@@ -720,6 +726,7 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             (self.map[key].1.next.is_none() || {
                 let next = self.map[key].1.next.unwrap();
 
+                next != key &&
                 self.map.contains_key(next) && {
                     &&& self.map[next].1.first_child == false
                     &&& self.map[next].1.back == Some(key)
@@ -733,6 +740,7 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             (self.map[key].1.child.is_none() || {
                 let child = self.map[key].1.child.unwrap();
 
+                child != key &&
                 self.map.contains_key(child) && {
                     &&& self.map[child].1.first_child == true
                     &&& self.map[child].1.back == Some(key)
@@ -771,6 +779,38 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         }
     }
 
+    property!{
+        contains_child(parent: CapKey, child: CapKey) {
+            assert(pre.map.contains_key(parent) && pre.map[parent].1.child == Some(child) ==> pre.map.contains_key(child));
+        }
+    }
+
+    property!{
+        contains_next(parent: CapKey) {
+            assert(pre.map.contains_key(parent) && pre.map[parent].1.next.is_some()
+                ==> (pre.map[parent].1.next.unwrap() != parent && pre.map.contains_key(pre.map[parent].1.next.unwrap())));
+        }
+    }
+
+    property!{
+        contains_back(parent: CapKey) {
+            assert(pre.map.contains_key(parent) && pre.map[parent].1.back.is_some()
+                ==> (pre.map[parent].1.back.unwrap() != parent && pre.map.contains_key(pre.map[parent].1.back.unwrap())));
+        }
+    }
+
+    #[invariant]
+    pub fn addr_nonnull(&self) -> bool {
+        forall |key: CapKey| self.map.contains_key(key) ==>
+            #[trigger] self.map[key].0.addr() != 0
+    }
+
+    property!{
+        addr_nonnull(key: CapKey) {
+            assert(pre.map.contains_key(key) ==> pre.map[key].0.addr() != 0);
+        }
+    }
+
     transition!{
         insert_first_child(t: T, key: CapKey, parent: CapKey) {
             let inserted = LinkedNode { first_child: true, back: Some(parent), next: None, child: None };
@@ -779,13 +819,19 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             require token_invariant(new_map, key);
             require !pre.map.contains_key(key);
             require pre.map.contains_key(parent);
-            require pre.map[parent].1.child.is_none();
             require pre.state == SysState::Clean;
+            require t.addr() != 0;
 
             deposit tokens += [key => t];
             withdraw tokens -= [parent => pre.map[parent].0];
 
-            update state = SysState::InsertFirst { inserted: key, parent };
+            if pre.map[parent].1.child == Option::<CapKey>::None {
+                update state = SysState::InsertFinish { inserted: key, parent };
+            }
+            else {
+                update state = SysState::InsertFirst { inserted: key, parent };
+            }
+
             update map = new_map;
         }
     }
@@ -794,6 +840,13 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     pub fn state_inv(&self) -> bool {
         match self.state {
             SysState::InsertFirst { inserted, parent } => {
+                let insert_node = LinkedNode { first_child: true, back: Some(parent), next: None, child: None };
+                self.map.contains_key(parent)
+                && self.map.contains_key(inserted)
+                && self.map[inserted].1 == insert_node
+                && inserted != parent
+            }
+            SysState::InsertFinish { inserted, parent } => {
                 let insert_node = LinkedNode { first_child: true, back: Some(parent), next: None, child: None };
                 self.map.contains_key(parent)
                 && self.map.contains_key(inserted)
@@ -817,7 +870,7 @@ tokenized_state_machine!(LinkSystem<T: Token>{
 
             require p.addr() == old.addr();
             require token_invariant(new_map, parent);
-            require pre.state == SysState::InsertFirst { inserted, parent };
+            require pre.state == SysState::InsertFinish { inserted, parent };
 
             deposit tokens += [parent => p];
             update state = SysState::Clean;
