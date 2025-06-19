@@ -4,7 +4,7 @@ use vstd::{
     simple_pptr::{PPtr, PointsTo},
 };
 
-use crate::state::{token_invariant, CapKey, LinkSystem, LinkedNode, SysState, Token};
+use crate::state::{CapKey, LinkSystem, SysState, Token};
 
 verus! {
 
@@ -81,24 +81,8 @@ impl Meta {
 
         proof!{
             token.is_nonnull();
-            let inserted = LinkedNode {
-                first_child: true,
-                back: Some(parent),
-                next: self.spec@.value()[parent].1.child,
-                child: None
-            };
-            let new_map = self.spec@.value().insert(child, (token, inserted));
-
-            assert(self.spec@.value()[parent].0.addr() == parent_ptr.addr());
-            if self.spec@.value()[parent].1.child.is_some() {
-                self.instance.borrow().contains_child(parent, self.spec.borrow());
-                assert(self.spec@.value().contains_key(self.spec@.value()[parent].1.child.unwrap()));
-                assert(self.spec@.value()[self.spec@.value()[parent].1.child.unwrap()].0.addr() == next);
-            }
-            assert(token_invariant(new_map, child));
-
+            self.instance.borrow().contains_child(parent, self.spec.borrow());
             self.instance.borrow().token_invariant(parent, self.spec.borrow());
-            assert(token_invariant(self.spec@.value(), parent));
         };
 
         let tracked parent_token = self.instance.borrow_mut().insert_child(
@@ -117,6 +101,7 @@ impl Meta {
 
         if parent_node.child == 0 {
             proof!{
+                // prove that parent.child == None in this case
                 let child_key = self.spec@.value()[parent].1.child;
                 if child_key.is_some() {
                     self.instance.borrow().token_invariant(parent, self.spec.borrow());
