@@ -124,20 +124,26 @@ impl Meta {
             }
         }
         else {
-            proof!{ admit(); };
+            let tracked next_perm = self.instance.borrow_mut().insert_child_fix_next(
+                child, parent, self.spec.borrow(), self.state.borrow_mut());
+
+            let next_ptr = PPtr::<Node>::from_addr(parent_node.child);
+            assert(next_ptr.addr() == next_perm.addr());
+
+            let mut next_node = next_ptr.take(Tracked(&mut next_perm));
+            next_node.back = ptr.addr();
+            next_node.first_child = false;
+            next_ptr.put(Tracked(&mut next_perm), next_node);
+
+            let ghost next = self.spec@.value()[parent].1.child.unwrap();
+            let tracked _ = self.instance.borrow_mut().insert_child_finish_next(
+                    next_perm, child, parent, next, self.spec.borrow_mut(), self.state.borrow_mut(), next_perm);
         }
 
         parent_node.child = ptr.addr();
         parent_ptr.put(Tracked(&mut parent_token), parent_node);
 
         proof! {
-            let (_, old_parent_node) = self.spec@.value()[parent];
-
-            let new_map = self.spec@.value()
-                .insert(parent, (parent_token, LinkedNode { child: Some(child), ..old_parent_node }));
-
-            assert(token_invariant(new_map, parent));
-
             self.instance.borrow_mut().finish_insert(
                 parent_token, child, parent, self.spec.borrow_mut(), self.state.borrow_mut(), parent_token);
 
