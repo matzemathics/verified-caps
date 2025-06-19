@@ -1,5 +1,3 @@
-use core::borrow::Borrow;
-
 use vstd::{
     hash_map::HashMapWithView,
     prelude::*,
@@ -46,14 +44,22 @@ struct Meta {
 }
 
 impl Meta {
+    spec fn wf(&self) -> bool {
+        self.state@.value() == SysState::Clean &&
+        self.spec@.instance_id() == self.instance@.id() &&
+        self.state@.instance_id() == self.instance@.id() &&
+        self.spec@.value().dom() == self.map@.dom() &&
+        forall |key: CapKey| #[trigger] self.map@.contains_key(key) ==>
+            self.spec@.value()[key].0.addr() == self.map@[key].addr()
+    }
+
     fn insert_child(&mut self, parent: CapKey, child: CapKey)
     requires
-        old(self).map@.contains_key(parent),
-        old(self).state@.value() == SysState::Clean,
         old(self).spec@.value().contains_key(parent),
         !old(self).spec@.value().contains_key(child),
-        old(self).spec@.instance_id() == old(self).instance@.id(),
-        old(self).state@.instance_id() == old(self).instance@.id(),
+        old(self).wf()
+    ensures
+        self.wf()
     {
         proof!{
             // needed later to show parent.next != child && parent.back != child
@@ -78,7 +84,7 @@ impl Meta {
             let inserted = LinkedNode { first_child: true, back: Some(parent), next: None, child: None };
             let new_map = self.spec@.value().insert(child, (token, inserted));
 
-            assume(new_map[parent].0.addr() == parent_ptr.addr());
+            assert(self.spec@.value()[parent].0.addr() == parent_ptr.addr());
             assert(token_invariant(new_map, child));
 
             self.instance.borrow().token_invariant(parent, self.spec.borrow());
@@ -121,6 +127,8 @@ impl Meta {
 
             self.instance.borrow_mut().finish_insert_first(
                 parent_token, child, parent, self.spec.borrow_mut(), self.state.borrow_mut(), parent_token);
+
+            assert(self.spec@.value().dom() == self.map@.dom());
         };
     }
 }
