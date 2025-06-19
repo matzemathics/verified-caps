@@ -7,7 +7,9 @@ use vstd::{
 verus! {
 
 pub type CapKey = u64;
+
 pub type CapData = u64;
+
 pub type CapMap = Map<CapKey, CapNode>;
 
 pub ghost struct CapNode {
@@ -17,29 +19,32 @@ pub ghost struct CapNode {
 }
 
 pub open spec fn connected(map: CapMap) -> bool {
-    forall |key: CapKey| map.contains_key(key)
-    ==> forall |index: int| 0 <= index < map[key].children.len()
-    ==> {
-        &&& map.contains_key(#[trigger] map[key].children[index])
-        &&& map[key].generation < map[map[key].children[index]].generation
-    }
+    forall|key: CapKey|
+        map.contains_key(key) ==> forall|index: int|
+            0 <= index < map[key].children.len() ==> {
+                &&& map.contains_key(#[trigger] map[key].children[index])
+                &&& map[key].generation < map[map[key].children[index]].generation
+            }
 }
 
 pub open spec fn generation_bounded(map: CapMap, bound: nat) -> bool {
-    forall |key: CapKey| map.contains_key(key) ==> #[trigger] map[key].generation < bound
+    forall|key: CapKey| map.contains_key(key) ==> #[trigger] map[key].generation < bound
 }
 
-pub open spec fn direct_children(map: CapMap, keys: Seq<CapKey>) -> Seq<CapKey>
-{
+pub open spec fn direct_children(map: CapMap, keys: Seq<CapKey>) -> Seq<CapKey> {
     keys.map_values(|key| map[key].children).flatten()
 }
 
 proof fn lemma_direct_children_inc_gen(map: CapMap, keys: Seq<CapKey>)
-requires
-    keys.to_set().subset_of(map.dom()),
-    connected(map),
-    direct_children(map, keys).len() != 0
-ensures keys.map_values(|key| map[key].generation as int).min() < direct_children(map, keys).map_values(|key| map[key].generation as int).min()
+    requires
+        keys.to_set().subset_of(map.dom()),
+        connected(map),
+        direct_children(map, keys).len() != 0,
+    ensures
+        keys.map_values(|key| map[key].generation as int).min() < direct_children(
+            map,
+            keys,
+        ).map_values(|key| map[key].generation as int).min(),
 {
     let generation = |key| map[key].generation as int;
 
@@ -47,19 +52,19 @@ ensures keys.map_values(|key| map[key].generation as int).min() < direct_childre
     let children = direct_children(map, keys).map_values(generation);
 
     children.min_ensures();
-    assert(exists |index| 0 <= index < children.len() && children[index] == children.min());
-    let min_child_index = choose |index: int|
+    assert(exists|index| 0 <= index < children.len() && children[index] == children.min());
+    let min_child_index = choose|index: int|
         0 <= index < children.len() && children[index] == children.min();
 
     axiom_seq_new_index(
         direct_children(map, keys).len(),
         |i| generation(direct_children(map, keys)[i]),
-        min_child_index
+        min_child_index,
     );
 
     parents.min_ensures();
-    assert(exists |index| 0 <= index < parents.len() && parents[index] == parents.min());
-    let min_parent_index = choose |index: int|
+    assert(exists|index| 0 <= index < parents.len() && parents[index] == parents.min());
+    let min_parent_index = choose|index: int|
         0 <= index < parents.len() && parents[index] == parents.min();
 
     axiom_seq_new_index(keys.len(), |i| generation(keys[i]), min_parent_index);
@@ -68,9 +73,9 @@ ensures keys.map_values(|key| map[key].generation as int).min() < direct_childre
     let unflat = keys.map_values(get_children);
     lemma_flatten_index(unflat, min_child_index);
 
-    let (origin, offset) = choose |origin: int, offset: int|
-        0 <= origin < unflat.len() && 0 <= offset < unflat[origin].len() &&
-        unflat[origin][offset] == unflat.flatten()[min_child_index];
+    let (origin, offset) = choose|origin: int, offset: int|
+        0 <= origin < unflat.len() && 0 <= offset < unflat[origin].len() && unflat[origin][offset]
+            == unflat.flatten()[min_child_index];
 
     assert(generation(keys[min_parent_index]) <= parents[origin] == generation(keys[origin]));
 
@@ -81,26 +86,25 @@ ensures keys.map_values(|key| map[key].generation as int).min() < direct_childre
 }
 
 proof fn lemma_direct_children_closed(map: CapMap, keys: Seq<CapKey>)
-requires
-    keys.to_set().subset_of(map.dom()),
-    connected(map)
-ensures
-    direct_children(map, keys).to_set().subset_of(map.dom())
+    requires
+        keys.to_set().subset_of(map.dom()),
+        connected(map),
+    ensures
+        direct_children(map, keys).to_set().subset_of(map.dom()),
 {
-    assert forall |key: CapKey| direct_children(map, keys).contains(key)
-    implies  #[trigger] map.dom().contains(key)
-    by {
-        let that_index = choose |index: int|
-            0 <= index < direct_children(map, keys).len() &&
-            direct_children(map, keys)[index] == key;
+    assert forall|key: CapKey|
+        direct_children(map, keys).contains(key) implies #[trigger] map.dom().contains(key) by {
+        let that_index = choose|index: int|
+            0 <= index < direct_children(map, keys).len() && direct_children(map, keys)[index]
+                == key;
 
         let children = |key: CapKey| map[key].children;
         let unflat = keys.map_values(children);
         lemma_flatten_index(unflat, that_index);
 
-        let (origin, offset) = choose |origin: int, offset: int|
-            0 <= origin < unflat.len() && 0 <= offset < unflat[origin].len() &&
-            unflat[origin][offset] == unflat.flatten()[that_index];
+        let (origin, offset) = choose|origin: int, offset: int|
+            0 <= origin < unflat.len() && 0 <= offset < unflat[origin].len()
+                && unflat[origin][offset] == unflat.flatten()[that_index];
 
         assert(map.contains_key(keys[origin]));
         assert(map.contains_key(map[keys[origin]].children[offset]));
@@ -108,18 +112,19 @@ ensures
 }
 
 proof fn lemma_flatten_index<A>(arg: Seq<Seq<A>>, index: int)
-requires 0 <= index < arg.flatten().len()
-ensures exists |origin: int, offset: int|
-    0 <= origin < arg.len() && 0 <= offset < arg[origin].len() &&
-    arg[origin][offset] == arg.flatten()[index]
-decreases arg.len()
+    requires
+        0 <= index < arg.flatten().len(),
+    ensures
+        exists|origin: int, offset: int|
+            0 <= origin < arg.len() && 0 <= offset < arg[origin].len() && arg[origin][offset]
+                == arg.flatten()[index],
+    decreases arg.len(),
 {
-    if arg.len() == 0 { }
-    else {
+    if arg.len() == 0 {
+    } else {
         if index < arg.first().len() {
             axiom_seq_add_index1(arg.first(), arg.drop_first().flatten(), index);
-        }
-        else {
+        } else {
             axiom_seq_add_index2(arg.first(), arg.drop_first().flatten(), index);
             lemma_flatten_index(arg.drop_first(), index - arg.first().len());
         }
@@ -127,22 +132,22 @@ decreases arg.len()
 }
 
 proof fn lemma_flatten_index2<A>(arg: Seq<Seq<A>>, origin: int, offset: int)
-requires
-    0 <= origin < arg.len(),
-    0 <= offset < arg[origin].len(),
-ensures exists |index|
-    0 <= index < arg.flatten().len() && arg.flatten()[index] == arg[origin][offset]
-decreases arg.len()
+    requires
+        0 <= origin < arg.len(),
+        0 <= offset < arg[origin].len(),
+    ensures
+        exists|index|
+            0 <= index < arg.flatten().len() && arg.flatten()[index] == arg[origin][offset],
+    decreases arg.len(),
 {
     if origin == 0 {
         axiom_seq_add_index1(arg.first(), arg.drop_first().flatten(), offset);
         assert(arg[0][offset] == arg.flatten()[offset]);
-    }
-    else {
+    } else {
         lemma_flatten_index2(arg.drop_first(), origin - 1, offset);
-        let index = choose |index: int|
-            0 <= index < arg.drop_first().flatten().len() &&
-            arg.drop_first().flatten()[index] == arg[origin][offset];
+        let index = choose|index: int|
+            0 <= index < arg.drop_first().flatten().len() && arg.drop_first().flatten()[index]
+                == arg[origin][offset];
 
         axiom_seq_add_index2(arg.first(), arg.drop_first().flatten(), index + arg.first().len());
         assert(arg[origin][offset] == arg.flatten()[index + arg.first().len()]);
@@ -150,14 +155,16 @@ decreases arg.len()
 }
 
 proof fn lemma_transitive_children_decreases(map: CapMap, keys: Seq<CapKey>, bound: nat)
-requires
-    connected(map),
-    generation_bounded(map, bound),
-    keys.to_set().subset_of(map.dom()),
-    direct_children(map, keys).len() != 0
-ensures
-    bound - keys.map_values(|key| map[key].generation as int).min() >
-    bound - direct_children(map, keys).map_values(|key| map[key].generation as int).min()
+    requires
+        connected(map),
+        generation_bounded(map, bound),
+        keys.to_set().subset_of(map.dom()),
+        direct_children(map, keys).len() != 0,
+    ensures
+        bound - keys.map_values(|key| map[key].generation as int).min() > bound - direct_children(
+            map,
+            keys,
+        ).map_values(|key| map[key].generation as int).min(),
 {
     lemma_direct_children_inc_gen(map, keys);
 
@@ -166,21 +173,29 @@ ensures
     let new_gens = direct_children(map, keys).map_values(generation);
 
     new_gens.min_ensures();
-    assert(exists |i: int| new_gens.len() > i && new_gens[i] == new_gens.min());
-    let that_index = choose |i: int| 0 <= i < new_gens.len() && new_gens[i] == new_gens.min();
+    assert(exists|i: int| new_gens.len() > i && new_gens[i] == new_gens.min());
+    let that_index = choose|i: int| 0 <= i < new_gens.len() && new_gens[i] == new_gens.min();
 
-    assert(that_index < direct_children(map, keys).len() == direct_children(map, keys).map_values(generation).len());
-    axiom_seq_new_index(direct_children(map, keys).len(), |i| generation(direct_children(map, keys)[i]), that_index);
+    assert(that_index < direct_children(map, keys).len() == direct_children(map, keys).map_values(
+        generation,
+    ).len());
+    axiom_seq_new_index(
+        direct_children(map, keys).len(),
+        |i| generation(direct_children(map, keys)[i]),
+        that_index,
+    );
 
-    assert(direct_children(map, keys).map_values(generation)[that_index] == generation(direct_children(map, keys)[that_index]));
+    assert(direct_children(map, keys).map_values(generation)[that_index] == generation(
+        direct_children(map, keys)[that_index],
+    ));
     let that_key = direct_children(map, keys)[that_index];
 
     let unflat = keys.map_values(children);
     lemma_flatten_index(unflat, that_index);
 
-    let (origin, offset) = choose |origin: int, offset: int|
-        0 <= origin < unflat.len() && 0 <= offset < unflat[origin].len() &&
-        unflat[origin][offset] == unflat.flatten()[that_index];
+    let (origin, offset) = choose|origin: int, offset: int|
+        0 <= origin < unflat.len() && 0 <= offset < unflat[origin].len() && unflat[origin][offset]
+            == unflat.flatten()[that_index];
 
     assert(map.contains_key(keys[origin]));
     assert(map.contains_key(map[keys[origin]].children[offset]));
@@ -194,106 +209,121 @@ ensures
 }
 
 #[via_fn]
-proof fn transitive_children_decreases_via(map: CapMap, keys: Seq<CapKey>, bound: nat)
-{
-    if direct_children(map, keys).len() == 0 {}
-    else {
+proof fn transitive_children_decreases_via(map: CapMap, keys: Seq<CapKey>, bound: nat) {
+    if direct_children(map, keys).len() == 0 {
+    } else {
         lemma_direct_children_closed(map, keys);
         lemma_transitive_children_decreases(map, keys, bound);
     }
 }
 
 pub open spec fn remove_all<A>(input: Seq<A>, needles: Seq<A>) -> Seq<A>
-decreases needles.len()
+    decreases needles.len(),
 {
-    if needles.len() == 0 { input }
-    else {
+    if needles.len() == 0 {
+        input
+    } else {
         remove_all(input.remove_value(needles.last()), needles.drop_last())
     }
 }
 
 pub open spec fn transitive_children(map: CapMap, keys: Seq<CapKey>, bound: nat) -> Seq<CapKey>
-decreases bound - keys.map_values(|key| map[key].generation as int).min()
-    when keys.to_set().subset_of(map.dom())
-        && connected(map)
-        && generation_bounded(map, bound)
+    decreases bound - keys.map_values(|key| map[key].generation as int).min(),
+    when keys.to_set().subset_of(map.dom()) && connected(map) && generation_bounded(map, bound)
     via transitive_children_decreases_via
 {
     let new_keys = direct_children(map, keys);
 
-    if new_keys.len() == 0 { keys }
-    else { keys + transitive_children(map, new_keys, bound) }
+    if new_keys.len() == 0 {
+        keys
+    } else {
+        keys + transitive_children(map, new_keys, bound)
+    }
 }
 
-proof fn lemma_direct_children_complete(map: CapMap, keys: Seq<CapKey>, parent: CapKey, child: CapKey)
-requires
-    map.contains_key(parent),
-    map[parent].children.contains(child),
-    keys.contains(parent),
-ensures
-    direct_children(map, keys).contains(child)
+proof fn lemma_direct_children_complete(
+    map: CapMap,
+    keys: Seq<CapKey>,
+    parent: CapKey,
+    child: CapKey,
+)
+    requires
+        map.contains_key(parent),
+        map[parent].children.contains(child),
+        keys.contains(parent),
+    ensures
+        direct_children(map, keys).contains(child),
 {
-    let parent_index = choose |index: int| 0 <= index < keys.len() && keys[index] == parent;
-    let child_offset = choose |index: int| 0 <= index < map[parent].children.len() && map[parent].children[index] == child;
+    let parent_index = choose|index: int| 0 <= index < keys.len() && keys[index] == parent;
+    let child_offset = choose|index: int|
+        0 <= index < map[parent].children.len() && map[parent].children[index] == child;
 
     let children = |key: CapKey| map[key].children;
     lemma_flatten_index2(keys.map_values(children), parent_index, child_offset);
 }
 
 proof fn lemma_direct_children_co_complete(map: CapMap, keys: Seq<CapKey>, child: CapKey)
-requires
-    map.contains_key(child),
-    child_parent(map),
-    keys.to_set().subset_of(map.dom()),
-    map[child].parent.is_some(),
-    direct_children(map, keys).contains(child),
-ensures
-    keys.contains(map[child].parent.unwrap()),
+    requires
+        map.contains_key(child),
+        child_parent(map),
+        keys.to_set().subset_of(map.dom()),
+        map[child].parent.is_some(),
+        direct_children(map, keys).contains(child),
+    ensures
+        keys.contains(map[child].parent.unwrap()),
 {
-    let that_index = choose |index: int|
-        0 <= index < direct_children(map, keys).len() &&
-        direct_children(map, keys)[index] == child;
+    let that_index = choose|index: int|
+        0 <= index < direct_children(map, keys).len() && direct_children(map, keys)[index] == child;
 
     let get_children = |key: CapKey| map[key].children;
     let unflat = keys.map_values(get_children);
     lemma_flatten_index(unflat, that_index);
 
-    let (origin, offset) = choose |origin: int, offset: int|
-        0 <= origin < unflat.len() && 0 <= offset < unflat[origin].len() &&
-        unflat[origin][offset] == unflat.flatten()[that_index];
+    let (origin, offset) = choose|origin: int, offset: int|
+        0 <= origin < unflat.len() && 0 <= offset < unflat[origin].len() && unflat[origin][offset]
+            == unflat.flatten()[that_index];
 
     assert(map[keys[origin]].children[offset] == child);
     assert(map[child].parent == Some(keys[origin]));
 }
 
 proof fn lemma_transitive_children_rec(map: CapMap, keys: Seq<CapKey>, bound: nat)
-requires
-    connected(map),
-    generation_bounded(map, bound),
-    keys.to_set().subset_of(map.dom()),
-ensures
-    transitive_children(map, keys, bound) == keys + transitive_children(map, direct_children(map, keys), bound)
+    requires
+        connected(map),
+        generation_bounded(map, bound),
+        keys.to_set().subset_of(map.dom()),
+    ensures
+        transitive_children(map, keys, bound) == keys + transitive_children(
+            map,
+            direct_children(map, keys),
+            bound,
+        ),
 {
     if direct_children(map, keys).len() == 0 {
         assert(transitive_children(map, keys, bound) == keys);
         assert(transitive_children(map, direct_children(map, keys), bound).len() == 0);
-    }
-    else {
+    } else {
         lemma_direct_children_closed(map, keys);
     }
 }
 
-proof fn lemma_transitive_children_complete(map: CapMap, keys: Seq<CapKey>, bound: nat, parent: CapKey, child: CapKey)
-requires
-    connected(map),
-    generation_bounded(map, bound),
-    keys.to_set().subset_of(map.dom()),
-    map.contains_key(parent),
-    transitive_children(map, keys, bound).contains(parent),
-    map[parent].children.contains(child)
-ensures
-    transitive_children(map, keys, bound).contains(child)
-decreases bound - keys.map_values(|key| map[key].generation as int).min()
+proof fn lemma_transitive_children_complete(
+    map: CapMap,
+    keys: Seq<CapKey>,
+    bound: nat,
+    parent: CapKey,
+    child: CapKey,
+)
+    requires
+        connected(map),
+        generation_bounded(map, bound),
+        keys.to_set().subset_of(map.dom()),
+        map.contains_key(parent),
+        transitive_children(map, keys, bound).contains(parent),
+        map[parent].children.contains(child),
+    ensures
+        transitive_children(map, keys, bound).contains(child),
+    decreases bound - keys.map_values(|key| map[key].generation as int).min(),
 {
     let new_keys = direct_children(map, keys);
 
@@ -306,58 +336,66 @@ decreases bound - keys.map_values(|key| map[key].generation as int).min()
         assert(new_keys.is_prefix_of(transitive_children(map, new_keys, bound)));
 
         assert(transitive_children(map, new_keys, bound).contains(child));
-        assert(transitive_children(map, new_keys, bound).is_suffix_of(transitive_children(map, keys, bound)));
-    }
-    else {
-        let parent_index = choose |index: int|
-            0 <= index < transitive_children(map, keys, bound).len() &&
-            transitive_children(map, keys, bound)[index] == parent;
+        assert(transitive_children(map, new_keys, bound).is_suffix_of(
+            transitive_children(map, keys, bound),
+        ));
+    } else {
+        let parent_index = choose|index: int|
+            0 <= index < transitive_children(map, keys, bound).len() && transitive_children(
+                map,
+                keys,
+                bound,
+            )[index] == parent;
 
         lemma_transitive_children_rec(map, keys, bound);
 
         if parent_index < keys.len() {
             axiom_seq_add_index1(keys, transitive_children(map, new_keys, bound), parent_index);
-        }
-        else {
+        } else {
             axiom_seq_add_index2(keys, transitive_children(map, new_keys, bound), parent_index);
             assert(transitive_children(map, new_keys, bound).contains(parent));
 
             if new_keys.len() == 0 {
                 assert(transitive_children(map, keys, bound) == keys);
-            }
-            else {
+            } else {
                 lemma_direct_children_closed(map, keys);
                 lemma_transitive_children_decreases(map, keys, bound);
                 lemma_transitive_children_complete(map, new_keys, bound, parent, child);
                 assert(transitive_children(map, new_keys, bound).contains(child));
 
-                let child_index = choose |index: int|
-                    0 <= index < transitive_children(map, new_keys, bound).len() &&
-                    transitive_children(map, new_keys, bound)[index] == child;
+                let child_index = choose|index: int|
+                    0 <= index < transitive_children(map, new_keys, bound).len()
+                        && transitive_children(map, new_keys, bound)[index] == child;
 
-                axiom_seq_add_index2(keys, transitive_children(map, new_keys, bound), keys.len() + child_index);
+                axiom_seq_add_index2(
+                    keys,
+                    transitive_children(map, new_keys, bound),
+                    keys.len() + child_index,
+                );
                 assert(transitive_children(map, keys, bound).contains(child));
             }
         }
     }
 }
 
-proof fn lemma_transitive_children_co_complete(map: CapMap, keys: Seq<CapKey>, bound: nat, child: CapKey)
-requires
-    connected(map),
-    generation_bounded(map, bound),
-    child_parent(map),
-
-    transitive_children(map, keys, bound).contains(child),
-    keys.to_set().subset_of(map.dom()),
-    map.contains_key(child),
-    !keys.contains(child),
-    map[child].parent.is_some(),
-
-ensures
-    transitive_children(map, keys, bound).contains(map[child].parent.unwrap()),
-
-decreases bound - keys.map_values(|key| map[key].generation as int).min()
+proof fn lemma_transitive_children_co_complete(
+    map: CapMap,
+    keys: Seq<CapKey>,
+    bound: nat,
+    child: CapKey,
+)
+    requires
+        connected(map),
+        generation_bounded(map, bound),
+        child_parent(map),
+        transitive_children(map, keys, bound).contains(child),
+        keys.to_set().subset_of(map.dom()),
+        map.contains_key(child),
+        !keys.contains(child),
+        map[child].parent.is_some(),
+    ensures
+        transitive_children(map, keys, bound).contains(map[child].parent.unwrap()),
+    decreases bound - keys.map_values(|key| map[key].generation as int).min(),
 {
     let parent = map[child].parent.unwrap();
     let rec_call = transitive_children(map, direct_children(map, keys), bound);
@@ -368,44 +406,49 @@ decreases bound - keys.map_values(|key| map[key].generation as int).min()
 
     if direct_children(map, keys).contains(child) {
         lemma_direct_children_co_complete(map, keys, child);
-        let index = choose |index: int| 0 <= index < keys.len() && keys[index] == parent;
+        let index = choose|index: int| 0 <= index < keys.len() && keys[index] == parent;
         axiom_seq_add_index1(keys, rec_call, index);
-    }
-    else {
+    } else {
         lemma_transitive_children_decreases(map, keys, bound);
         lemma_transitive_children_co_complete(map, direct_children(map, keys), bound, child);
-        let index = choose |index: int| 0 <= index < rec_call.len() && rec_call[index] == parent;
+        let index = choose|index: int| 0 <= index < rec_call.len() && rec_call[index] == parent;
         axiom_seq_add_index2(keys, rec_call, index + keys.len());
     }
 }
 
 pub open spec fn parent_child(map: CapMap) -> bool {
-    forall |key: CapKey| map.contains_key(key) && map[key].parent.is_some()
-    ==> {
-        &&& #[trigger] map.contains_key(map[key].parent.unwrap())
-        &&& map[map[key].parent.unwrap()].children.contains(key)
-    }
+    forall|key: CapKey|
+        map.contains_key(key) && map[key].parent.is_some() ==> {
+            &&& #[trigger] map.contains_key(map[key].parent.unwrap())
+            &&& map[map[key].parent.unwrap()].children.contains(key)
+        }
 }
 
 pub open spec fn child_parent(map: CapMap) -> bool {
-    forall |key: CapKey, index: int| map.contains_key(key) && 0 <= index < map[key].children.len()
-    ==> {
-        &&& map.contains_key(map[key].children[index])
-        &&& #[trigger] map[map[key].children[index]].parent == Some(key)
-    }
+    forall|key: CapKey, index: int|
+        map.contains_key(key) && 0 <= index < map[key].children.len() ==> {
+            &&& map.contains_key(map[key].children[index])
+            &&& #[trigger] map[map[key].children[index]].parent == Some(key)
+        }
 }
 
 pub open spec fn revoke_children(map: CapMap, parent: CapKey, bound: nat) -> CapMap {
-    map
-        .insert(parent, CapNode { children: Seq::empty(), ..map[parent] })
-        .remove_keys(transitive_children(map, map[parent].children, bound).to_set())
+    map.insert(parent, CapNode { children: Seq::empty(), ..map[parent] }).remove_keys(
+        transitive_children(map, map[parent].children, bound).to_set(),
+    )
 }
 
-pub open spec fn insert_child(map: CapMap, parent: CapKey, child: CapKey, generation: nat) -> CapMap {
+pub open spec fn insert_child(
+    map: CapMap,
+    parent: CapKey,
+    child: CapKey,
+    generation: nat,
+) -> CapMap {
     let parent_node = map[parent];
-    map
-        .insert(parent, CapNode { children: parent_node.children.push(child), ..parent_node })
-        .insert(child, CapNode { generation, parent: Some(parent), children: Seq::empty() })
+    map.insert(
+        parent,
+        CapNode { children: parent_node.children.push(child), ..parent_node },
+    ).insert(child, CapNode { generation, parent: Some(parent), children: Seq::empty() })
 }
 
 state_machine!{
@@ -508,63 +551,57 @@ state_machine!{
 }
 
 proof fn revoke_inv_connected(pre: CapMap, post: CapMap, parent: CapKey, bound: nat)
-requires
-    connected(pre),
-    child_parent(pre),
-    pre.contains_key(parent),
-    generation_bounded(pre, bound),
-    generation_bounded(post, bound),
-    post == revoke_children(pre, parent, bound),
-ensures connected(post)
+    requires
+        connected(pre),
+        child_parent(pre),
+        pre.contains_key(parent),
+        generation_bounded(pre, bound),
+        generation_bounded(post, bound),
+        post == revoke_children(pre, parent, bound),
+    ensures
+        connected(post),
 {
-    assert forall |key: CapKey, index: int|
-        post.contains_key(key) && 0 <= index < post[key].children.len()
-
-    implies {
+    assert forall|key: CapKey, index: int|
+        post.contains_key(key) && 0 <= index < post[key].children.len() implies {
         &&& post.contains_key(#[trigger] post[key].children[index])
         &&& post[key].generation < post[post[key].children[index]].generation
-    }
-
-    by {
+    } by {
         if key == parent {
             // this has no children
-        }
-        else if transitive_children(pre, pre[parent].children, bound).contains(key) {
+        } else if transitive_children(pre, pre[parent].children, bound).contains(key) {
             // keys were removed
-        }
-        else {
+        } else {
             // prove that children were not removed
             let child = post[key].children[index];
 
             if transitive_children(pre, pre[parent].children, bound).contains(child) {
                 assert(pre[child].parent.unwrap() == key);
 
-                if pre[parent].children.contains(child) {}
-                else {
+                if pre[parent].children.contains(child) {
+                } else {
                     lemma_transitive_children_co_complete(pre, pre[parent].children, bound, child);
                     assert(transitive_children(pre, pre[parent].children, bound).contains(key));
                 }
+            } else {
             }
-            else { }
         }
     };
 }
 
 proof fn revoke_inv_parent_child(pre: CapMap, post: CapMap, parent: CapKey, bound: nat)
-requires
-    connected(pre),
-    parent_child(pre),
-    generation_bounded(pre, bound),
-    pre.contains_key(parent),
-    post == revoke_children(pre, parent, bound),
-ensures parent_child(post)
+    requires
+        connected(pre),
+        parent_child(pre),
+        generation_bounded(pre, bound),
+        pre.contains_key(parent),
+        post == revoke_children(pre, parent, bound),
+    ensures
+        parent_child(post),
 {
-    assert forall |key: CapKey| post.contains_key(key) && post[key].parent.is_some()
-    implies {
+    assert forall|key: CapKey| post.contains_key(key) && post[key].parent.is_some() implies {
         &&& #[trigger] post.contains_key(post[key].parent.unwrap())
         &&& post[post[key].parent.unwrap()].children.contains(key)
-    }
-    by {
+    } by {
         let current_parent = pre[key].parent.unwrap();
         assert(current_parent == post[key].parent.unwrap());
 
@@ -574,14 +611,20 @@ ensures parent_child(post)
         if current_parent == parent {
             assert(pre[parent].children.contains(key));
             assert(pre[parent].children.len() > 0);
-            assert(pre[parent].children.is_prefix_of(transitive_children(pre, pre[parent].children, bound)));
+            assert(pre[parent].children.is_prefix_of(
+                transitive_children(pre, pre[parent].children, bound),
+            ));
             assert(transitive_children(pre, pre[parent].children, bound).contains(key));
-        }
-        else if transitive_children(pre, pre[parent].children, bound).contains(current_parent) {
-            lemma_transitive_children_complete(pre, pre[parent].children, bound, current_parent, key);
+        } else if transitive_children(pre, pre[parent].children, bound).contains(current_parent) {
+            lemma_transitive_children_complete(
+                pre,
+                pre[parent].children,
+                bound,
+                current_parent,
+                key,
+            );
             assert(transitive_children(pre, pre[parent].children, bound).contains(key));
-        }
-        else {
+        } else {
             assert(post.contains_key(current_parent));
             assert(post[current_parent] == pre[current_parent]);
         }
@@ -669,46 +712,53 @@ impl SysState {
     }
 }
 
-pub open spec fn back_link_condition<T>(state: SysState, map: Map<CapKey, (T, LinkedNode)>, key: CapKey) -> bool {
-    if map[key].1.back.is_none() { true }
-    else {
+pub open spec fn back_link_condition<T>(
+    state: SysState,
+    map: Map<CapKey, (T, LinkedNode)>,
+    key: CapKey,
+) -> bool {
+    if map[key].1.back.is_none() {
+        true
+    } else {
         let back = map[key].1.back.unwrap();
 
-        back != key &&
-        map.contains_key(back) &&
-        (state.allow_broken_back_link(key, back) || {
+        back != key && map.contains_key(back) && (state.allow_broken_back_link(key, back) || {
             match map[key].1.first_child {
                 true => map[back].1.child == Some(key),
-                false => map[back].1.next == Some(key)
+                false => map[back].1.next == Some(key),
             }
         })
     }
 }
 
-pub open spec fn next_link_condition<T>(state: SysState, map: Map<CapKey, (T, LinkedNode)>, key: CapKey) -> bool {
-    if map[key].1.next.is_none() { true }
-    else {
+pub open spec fn next_link_condition<T>(
+    state: SysState,
+    map: Map<CapKey, (T, LinkedNode)>,
+    key: CapKey,
+) -> bool {
+    if map[key].1.next.is_none() {
+        true
+    } else {
         let next = map[key].1.next.unwrap();
 
-        next != key &&
-        map.contains_key(next) &&
-        (state.allow_broken_next_link(key, next) || {
-            map[next].1.back == Some(key) &&
-            map[next].1.first_child == false
+        next != key && map.contains_key(next) && (state.allow_broken_next_link(key, next) || {
+            map[next].1.back == Some(key) && map[next].1.first_child == false
         })
     }
 }
 
-pub open spec fn child_link_condition<T>(state: SysState, map: Map<CapKey, (T, LinkedNode)>, key: CapKey) -> bool {
-    if map[key].1.child.is_none() { true }
-    else {
+pub open spec fn child_link_condition<T>(
+    state: SysState,
+    map: Map<CapKey, (T, LinkedNode)>,
+    key: CapKey,
+) -> bool {
+    if map[key].1.child.is_none() {
+        true
+    } else {
         let child = map[key].1.child.unwrap();
 
-        child != key &&
-        map.contains_key(child) &&
-        (state.allow_broken_child_link(key, child) || {
-            map[child].1.back == Some(key) &&
-            map[child].1.first_child == true
+        child != key && map.contains_key(child) && (state.allow_broken_child_link(key, child) || {
+            map[child].1.back == Some(key) && map[child].1.first_child == true
         })
     }
 }
@@ -717,21 +767,29 @@ pub trait Token: Sized {
     spec fn addr(&self) -> usize;
 
     proof fn is_nonnull(tracked &self)
-    ensures self.addr() != 0;
+        ensures
+            self.addr() != 0,
+    ;
 
     spec fn cond(&self, next: usize, child: usize, back: usize, first_child: bool) -> bool;
 }
 
 pub open spec fn token_invariant<T: Token>(map: Map<CapKey, (T, LinkedNode)>, key: CapKey) -> bool {
-    let next = if map[key].1.next.is_none() { 0 } else {
+    let next = if map[key].1.next.is_none() {
+        0
+    } else {
         map[map[key].1.next.unwrap()].0.addr()
     };
 
-    let child = if map[key].1.child.is_none() { 0 } else {
+    let child = if map[key].1.child.is_none() {
+        0
+    } else {
         map[map[key].1.child.unwrap()].0.addr()
     };
 
-    let back = if map[key].1.back.is_none() { 0 } else {
+    let back = if map[key].1.back.is_none() {
+        0
+    } else {
         map[map[key].1.back.unwrap()].0.addr()
     };
 
@@ -988,4 +1046,4 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     }
 });
 
-}
+} // verus!

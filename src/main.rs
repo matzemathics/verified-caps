@@ -25,6 +25,7 @@ mod treap;
 
 verus! {
 
-fn main() { }
+fn main() {
+}
 
 } // verus!

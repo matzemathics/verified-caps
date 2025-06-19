@@ -12,15 +12,14 @@ verus! {
 // 1 - extend vstd or re-wrap rust std library (assuming the rust implementation is sound)
 // 2 - use PCell to have "interior mutability"
 // 3 - use PPtr to introduce an additional redirection -> allows referencing elements from the outside
-
 #[verifier::reject_recursive_types(K)]
 #[verifier::reject_recursive_types(V)]
-pub struct MutPointerMap<K: View+Eq+Hash, V> {
+pub struct MutPointerMap<K: View + Eq + Hash, V> {
     m: HashMapWithView<K, PPtr<V>>,
     credits: Tracked<Map<K::V, simple_pptr::PointsTo<V>>>,
 }
 
-impl<K: View+Eq+Hash, V> View for MutPointerMap<K, V> {
+impl<K: View + Eq + Hash, V> View for MutPointerMap<K, V> {
     type V = Map<K::V, (usize, MemContents<V>)>;
 
     closed spec fn view(&self) -> Self::V {
@@ -28,9 +27,14 @@ impl<K: View+Eq+Hash, V> View for MutPointerMap<K, V> {
     }
 }
 
-impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
-    pub proof fn tracked_borrow(tracked &self) -> (tracked r: &Map<Key::V, simple_pptr::PointsTo<Value>>)
-    ensures r.map_values(|pt: simple_pptr::PointsTo<Value>| (pt.addr(), pt.mem_contents())) == self@
+impl<Key: View + Eq + Hash, Value> MutPointerMap<Key, Value> {
+    pub proof fn tracked_borrow(tracked &self) -> (tracked r: &Map<
+        Key::V,
+        simple_pptr::PointsTo<Value>,
+    >)
+        ensures
+            r.map_values(|pt: simple_pptr::PointsTo<Value>| (pt.addr(), pt.mem_contents()))
+                == self@,
     {
         self.credits.borrow()
     }
@@ -48,27 +52,33 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
     }
 
     pub closed spec fn init_besides(self, vacated: Set<Key::V>) -> bool {
-        forall |k: Key::V| self.credits@.dom().contains(k) && !vacated.contains(k) ==> #[trigger] self.credits@[k].is_init()
+        forall|k: Key::V|
+            self.credits@.dom().contains(k) && !vacated.contains(k)
+                ==> #[trigger] self.credits@[k].is_init()
     }
 
     pub proof fn lemma_is_init(&self, key: Key::V)
-    requires self.wf() && self@.contains_key(key)
-    ensures self@[key].1.is_init()
+        requires
+            self.wf() && self@.contains_key(key),
+        ensures
+            self@[key].1.is_init(),
     {
         assert(self.credits@[key].is_init());
     }
 
     pub fn new() -> (m: Self)
-    requires
-        vstd::std_specs::hash::obeys_key_model::<Key>(),
-        forall |k1: Key, k2: Key| k1@ == k2@ ==> k1 == k2
-    ensures
-        m@.is_empty() && m.wf()
+        requires
+            vstd::std_specs::hash::obeys_key_model::<Key>(),
+            forall|k1: Key, k2: Key| k1@ == k2@ ==> k1 == k2,
+        ensures
+            m@.is_empty() && m.wf(),
     {
         let m = HashMapWithView::new();
         let credits = Tracked(Map::tracked_empty());
 
-        assert(credits@.map_values(|v: simple_pptr::PointsTo<Value>| v.addr()) =~= m@.map_values(|v: PPtr<Value>| v.addr()));
+        assert(credits@.map_values(|v: simple_pptr::PointsTo<Value>| v.addr()) =~= m@.map_values(
+            |v: PPtr<Value>| v.addr(),
+        ));
 
         Self { m, credits }
     }
@@ -82,11 +92,15 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
     }
 
     proof fn lemma_dom_credits_eq_dom_m(&self)
-    requires self.addrs_match()
-    ensures self.m@.dom() == self.credits@.dom()
+        requires
+            self.addrs_match(),
+        ensures
+            self.m@.dom() == self.credits@.dom(),
     {
         assert(self.m@.dom() =~= self.m@.map_values(|v: PPtr<Value>| v.addr()).dom());
-        assert(self.credits@.dom() =~= self.credits@.map_values(|v: simple_pptr::PointsTo<Value>| v.addr()).dom());
+        assert(self.credits@.dom() =~= self.credits@.map_values(
+            |v: simple_pptr::PointsTo<Value>| v.addr(),
+        ).dom());
     }
 
     pub open spec fn index_opt(&self, k: Key::V) -> Option<Value> {
@@ -98,12 +112,12 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
     }
 
     pub fn insert(&mut self, k: Key, v: Value) -> (res: (Option<Value>, PPtr<Value>))
-    requires
-        old(self).wf()
-    ensures
-        self.wf(),
-        self@ == old(self)@.insert(k@, (res.1.addr(), MemContents::Init(v))),
-        old(self).index_opt(k@) == res.0,
+        requires
+            old(self).wf(),
+        ensures
+            self.wf(),
+            self@ == old(self)@.insert(k@, (res.1.addr(), MemContents::Init(v))),
+            old(self).index_opt(k@) == res.0,
     {
         let (ptr, perm) = PPtr::new(v);
 
@@ -119,12 +133,12 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
                 assert(old(self).index_opt(k@) == Some(perm.value()));
 
                 Some(ptr.take(Tracked(&mut perm)))
-            }
+            },
             None => {
                 proof!{ self.lemma_dom_credits_eq_dom_m(); };
                 assert(self.index_opt(k@) == Option::<Value>::None);
                 None
-            }
+            },
         };
 
         self.m.insert(k, ptr);
@@ -143,12 +157,13 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
     }
 
     proof fn borrow_perm(tracked &self, k: Key::V) -> (tracked perm: &simple_pptr::PointsTo<Value>)
-    requires self.wf() && self.m@.dom().contains(k)
-    ensures
-        perm.addr() == self.map_addrs()[k],
-        perm.is_init(),
-        perm.addr() == self@[k].0,
-        perm.mem_contents() == self@[k].1
+        requires
+            self.wf() && self.m@.dom().contains(k),
+        ensures
+            perm.addr() == self.map_addrs()[k],
+            perm.is_init(),
+            perm.addr() == self@[k].0,
+            perm.mem_contents() == self@[k].1,
     {
         self.lemma_dom_credits_eq_dom_m();
         assert(self.credits@.dom().contains(k));
@@ -158,12 +173,13 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
     }
 
     pub fn get(&self, k: &Key) -> (res: Option<&Value>)
-    requires self.wf()
-    ensures
-        match res {
-            Some(v) => self@.contains_key(k@) && *v == self@[k@].1.value(),
-            None => !self@.contains_key(k@),
-        },
+        requires
+            self.wf(),
+        ensures
+            match res {
+                Some(v) => self@.contains_key(k@) && *v == self@[k@].1.value(),
+                None => !self@.contains_key(k@),
+            },
     {
         let Some(ptr) = self.m.get(k) else {
             proof!{ self.lemma_dom_credits_eq_dom_m(); };
@@ -181,13 +197,13 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
     }
 
     fn update(&mut self, k: &Key, f: impl FnOnce(Value) -> Value)
-    requires
-        old(self).wf(),
-        old(self)@.dom().contains(k@),
-        f.requires((old(self)@[k@].1.value(),))
-    ensures
-        self.wf(),
-        f.ensures((old(self)@[k@].1.value(),), self@[k@].1.value())
+        requires
+            old(self).wf(),
+            old(self)@.dom().contains(k@),
+            f.requires((old(self)@[k@].1.value(),)),
+        ensures
+            self.wf(),
+            f.ensures((old(self)@[k@].1.value(),), self@[k@].1.value()),
     {
         proof!{ self.lemma_dom_credits_eq_dom_m(); };
         let ptr = self.m.get(k).unwrap();
@@ -207,17 +223,22 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
         }
     }
 
-    pub fn take(&mut self, element: PPtr<Value>, key: Ghost<Key>, vacated: Ghost<Set<Key::V>>) -> (res: Value)
-    requires
-        old(self).vacated(vacated@),
-        !vacated@.contains(key@@),
-        old(self)@.contains_key(key@@) && old(self)@[key@@].0 == element.addr()
-    ensures
-        self.vacated(vacated@.insert(key@@)),
-        self@.dom() == old(self)@.dom(),
-        self@ == old(self)@.insert(key@@, (element.addr(), MemContents::Uninit)),
-        res == old(self)@[key@@].1.value(),
-        self@[key@@].0 == element.addr(),
+    pub fn take(
+        &mut self,
+        element: PPtr<Value>,
+        key: Ghost<Key>,
+        vacated: Ghost<Set<Key::V>>,
+    ) -> (res: Value)
+        requires
+            old(self).vacated(vacated@),
+            !vacated@.contains(key@@),
+            old(self)@.contains_key(key@@) && old(self)@[key@@].0 == element.addr(),
+        ensures
+            self.vacated(vacated@.insert(key@@)),
+            self@.dom() == old(self)@.dom(),
+            self@ == old(self)@.insert(key@@, (element.addr(), MemContents::Uninit)),
+            res == old(self)@[key@@].1.value(),
+            self@[key@@].0 == element.addr(),
     {
         let tracked perm = self.credits.borrow_mut().tracked_remove(key.borrow().view());
         assert(perm.addr() == element.addr());
@@ -235,14 +256,20 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
         result
     }
 
-    pub fn untake(&mut self, element: PPtr<Value>, key: Ghost<Key>, value: Value, vacated: Ghost<Set<Key::V>>)
-    requires
-        old(self).vacated(vacated@.insert(key@@)),
-        old(self)@.contains_key(key@@) && old(self)@[key@@].0 == element.addr()
-    ensures
-        self.vacated(vacated@),
-        self@.dom() == old(self)@.dom(),
-        self@ == old(self)@.insert(key@@, (element.addr(), MemContents::Init(value)))
+    pub fn untake(
+        &mut self,
+        element: PPtr<Value>,
+        key: Ghost<Key>,
+        value: Value,
+        vacated: Ghost<Set<Key::V>>,
+    )
+        requires
+            old(self).vacated(vacated@.insert(key@@)),
+            old(self)@.contains_key(key@@) && old(self)@[key@@].0 == element.addr(),
+        ensures
+            self.vacated(vacated@),
+            self@.dom() == old(self)@.dom(),
+            self@ == old(self)@.insert(key@@, (element.addr(), MemContents::Init(value))),
     {
         let tracked perm = self.credits.borrow_mut().tracked_remove(key.borrow().view());
         assert(perm.addr() == element.addr());
@@ -257,13 +284,13 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
     }
 
     pub fn get_ptr(&self, key: &Key) -> (result: Option<PPtr<Value>>)
-    requires
-        self.addrs_match()
-    ensures
-        match result {
-            Some(v) => self@.contains_key(key@) && v.addr() == self@[key@].0,
-            None => !self@.contains_key(key@),
-        },
+        requires
+            self.addrs_match(),
+        ensures
+            match result {
+                Some(v) => self@.contains_key(key@) && v.addr() == self@[key@].0,
+                None => !self@.contains_key(key@),
+            },
     {
         proof!{ self.lemma_dom_credits_eq_dom_m() };
 
@@ -273,14 +300,16 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
                 assert(ptr.addr() == self.map_addrs()[key@]);
                 assert(self@.contains_key(key@) && ptr.addr() == self@[key@].0);
                 Some(ptr)
-            }
-            None => None
+            },
+            None => None,
         }
     }
 
     pub fn read(&self, element: PPtr<Value>, key: Ghost<Key>) -> &Value
-    requires self.wf() && self@.contains_key(key@@) && self@[key@@].0 == element.addr()
-    returns self@[key@@].1.value()
+        requires
+            self.wf() && self@.contains_key(key@@) && self@[key@@].0 == element.addr(),
+        returns
+            self@[key@@].1.value(),
     {
         proof!{ self.lemma_dom_credits_eq_dom_m(); };
         element.borrow(Tracked(self.borrow_perm(key@@)))
@@ -288,9 +317,7 @@ impl<Key: View+Eq+Hash, Value> MutPointerMap<Key, Value> {
 }
 
 fn test() {
-    assert(vstd::std_specs::hash::obeys_key_model::<i32>()) by {
-        admit()
-    };
+    assert(vstd::std_specs::hash::obeys_key_model::<i32>()) by { admit() };
 
     let mut map = MutPointerMap::new();
     map.insert(0, 42);
@@ -305,4 +332,4 @@ fn test() {
     assert(map@[0].1.value() == 43);
 }
 
-}
+} // verus!

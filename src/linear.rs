@@ -31,12 +31,10 @@ impl LinLink {
 
     #[verifier::when_used_as_spec(spec_null)]
     pub(crate) fn null() -> Self
-    returns Self::null()
+        returns
+            Self::null(),
     {
-        LinLink {
-            inner: 0,
-            key: Ghost(None)
-        }
+        LinLink { inner: 0, key: Ghost(None) }
     }
 
     #[verifier::type_invariant]
@@ -50,14 +48,17 @@ impl LinLink {
 
     #[verifier::when_used_as_spec(spec_is_null)]
     pub(crate) fn is_null(&self) -> bool
-    returns self.spec_is_null()
+        returns
+            self.spec_is_null(),
     {
         self.inner == 0
     }
 
     pub(crate) proof fn is_null_ensures_eq_null(tracked self)
-    requires self.is_null()
-    ensures self == Self::null()
+        requires
+            self.is_null(),
+        ensures
+            self == Self::null(),
     {
         use_type_invariant(self);
     }
@@ -70,27 +71,32 @@ pub struct LinSystem {
 
 type SpecMap = Map<<LinKey as View>::V, (KobjData, Seq<LinKey>)>;
 
-spec fn insert_child(map: SpecMap, parent_key: LinKey, child_key: LinKey, child_data: KobjData) -> SpecMap
-recommends
-    map.contains_key(parent_key@),
-    !map.contains_key(child_key@),
+spec fn insert_child(
+    map: SpecMap,
+    parent_key: LinKey,
+    child_key: LinKey,
+    child_data: KobjData,
+) -> SpecMap
+    recommends
+        map.contains_key(parent_key@),
+        !map.contains_key(child_key@),
 {
     let (parent_data, parent_children) = map[parent_key@];
-    map
-        .insert(child_key@, (child_data, Seq::empty()))
-        .insert(parent_key@, (parent_data, parent_children.insert(0, child_key)))
+    map.insert(child_key@, (child_data, Seq::empty())).insert(
+        parent_key@,
+        (parent_data, parent_children.insert(0, child_key)),
+    )
 }
 
 impl LinSystem {
     pub(crate) open spec fn valid(&self, link: LinLink) -> bool {
-        link.wf() && (
-            link.is_null() ||
-            self.map@.contains_key(link.key@.unwrap()@) && self.map@[link.key@.unwrap()@].0 == link.inner
-        )
+        link.wf() && (link.is_null() || self.map@.contains_key(link.key@.unwrap()@)
+            && self.map@[link.key@.unwrap()@].0 == link.inner)
     }
 
     pub(crate) open spec fn follow(&self, link: LinLink) -> LinNode
-    recommends self.valid(link) && !link.is_null()
+        recommends
+            self.valid(link) && !link.is_null(),
     {
         self.node_at(link.key@.unwrap()@)
     }
@@ -108,20 +114,26 @@ impl LinSystem {
     }
 
     pub(crate) open spec fn correctly_linked_horizontal(&self, key: <LinKey as View>::V) -> bool
-    recommends self.node_conditions(self.node_at(key))
+        recommends
+            self.node_conditions(self.node_at(key)),
     {
-        let node = self.node_at(key); {
-            &&& !node.next.is_null() ==>
-                !self.follow(node.next).prev.is_null() && self.follow(node.next).prev.key@.unwrap()@ == key
-            &&& !node.prev.is_null() ==>
-                !self.follow(node.prev).next.is_null() && self.follow(node.prev).next.key@.unwrap()@ == key
+        let node = self.node_at(key);
+        {
+            &&& !node.next.is_null() ==> !self.follow(node.next).prev.is_null() && self.follow(
+                node.next,
+            ).prev.key@.unwrap()@ == key
+            &&& !node.prev.is_null() ==> !self.follow(node.prev).next.is_null() && self.follow(
+                node.prev,
+            ).next.key@.unwrap()@ == key
         }
     }
 
     pub(crate) open spec fn correctly_linked_vertical(&self, key: <LinKey as View>::V) -> bool
-    recommends self.node_conditions(self.node_at(key))
+        recommends
+            self.node_conditions(self.node_at(key)),
     {
-        let node = self.node_at(key); {
+        let node = self.node_at(key);
+        {
             &&& !node.child.is_null() ==> {
                 &&& self.follow(node.child).prev.is_null()
                 &&& !self.follow(node.child).parent.is_null()
@@ -142,15 +154,15 @@ impl LinSystem {
 
     pub(crate) open spec fn locally_finite(&self) -> bool {
         &&& self.map.wf()
-        &&& forall |key: <LinKey as View>::V| self.map@.contains_key(key) ==>
-            #[trigger] self.node_conditions(self.node_at(key))
+        &&& forall|key: <LinKey as View>::V|
+            self.map@.contains_key(key) ==> #[trigger] self.node_conditions(self.node_at(key))
     }
 
     pub(crate) open spec fn correctly_linked(&self) -> bool {
-        &&& forall |key: <LinKey as View>::V| self.map@.contains_key(key) ==>
-                #[trigger] self.correctly_linked_horizontal(key)
-        &&& forall |key: <LinKey as View>::V| self.map@.contains_key(key) ==>
-                #[trigger] self.correctly_linked_vertical(key)
+        &&& forall|key: <LinKey as View>::V|
+            self.map@.contains_key(key) ==> #[trigger] self.correctly_linked_horizontal(key)
+        &&& forall|key: <LinKey as View>::V|
+            self.map@.contains_key(key) ==> #[trigger] self.correctly_linked_vertical(key)
     }
 
     pub(crate) open spec fn node_at(&self, key: <LinKey as View>::V) -> LinNode {
@@ -158,14 +170,21 @@ impl LinSystem {
     }
 
     pub(crate) open spec fn almost_correctly_linked(&self, exception: <LinKey as View>::V) -> bool {
-        &&& forall |key: <LinKey as View>::V| self.map@.contains_key(key) && key != exception ==>
-                #[trigger] self.correctly_linked_horizontal(key)
-        &&& forall |key: <LinKey as View>::V| self.map@.contains_key(key) && key != exception ==>
-                #[trigger] self.correctly_linked_vertical(key)
+        &&& forall|key: <LinKey as View>::V|
+            self.map@.contains_key(key) && key != exception
+                ==> #[trigger] self.correctly_linked_horizontal(key)
+        &&& forall|key: <LinKey as View>::V|
+            self.map@.contains_key(key) && key != exception
+                ==> #[trigger] self.correctly_linked_vertical(key)
     }
 
-    pub(crate) open spec fn future_first_child_of(&self, child_link: LinLink, parent: <LinKey as View>::V) -> bool {
-        let new_node = self.follow(child_link); {
+    pub(crate) open spec fn future_first_child_of(
+        &self,
+        child_link: LinLink,
+        parent: <LinKey as View>::V,
+    ) -> bool {
+        let new_node = self.follow(child_link);
+        {
             &&& !child_link.is_null() && self.valid(child_link)
             &&& !new_node.parent.is_null() && new_node.parent.key@.unwrap()@ == parent
             &&& new_node.next == self.follow(new_node.parent).child
@@ -175,32 +194,37 @@ impl LinSystem {
     }
 
     pub(crate) open spec fn view(&self) -> SpecMap {
-        self.map@.map_values(|arg: (usize, MemContents<LinNode>)| {
-            let v = arg.1.value();
-            (v.data, horizontal_keys(self, v.child))
-        })
+        self.map@.map_values(
+            |arg: (usize, MemContents<LinNode>)|
+                {
+                    let v = arg.1.value();
+                    (v.data, horizontal_keys(self, v.child))
+                },
+        )
     }
 
     proof fn addr_nonnull(tracked &self, key: LinKey)
-    requires self.map@.dom().contains(key@)
-    ensures self.map@[key@].0 != 0
+        requires
+            self.map@.dom().contains(key@),
+        ensures
+            self.map@[key@].0 != 0,
     {
         self.map.tracked_borrow().tracked_borrow(key@).is_nonnull()
     }
 
     fn insert(&mut self, data: KobjData, parent: LinKey, new: LinKey) -> (r: LinLink)
-    requires
-        new@ != parent@,
-        old(self).wf(),
-        old(self).map@.contains_key(parent@),
-        !old(self).map@.contains_key(new@),
-    ensures
-        self.map.wf(),
-        self.locally_finite(),
-        self@ == old(self)@.insert(new@, (data, Seq::empty())),
-        self.almost_correctly_linked(new@),
-        self.future_first_child_of(r, parent@),
-        r.key@.unwrap() == new
+        requires
+            new@ != parent@,
+            old(self).wf(),
+            old(self).map@.contains_key(parent@),
+            !old(self).map@.contains_key(new@),
+        ensures
+            self.map.wf(),
+            self.locally_finite(),
+            self@ == old(self)@.insert(new@, (data, Seq::empty())),
+            self.almost_correctly_linked(new@),
+            self.future_first_child_of(r, parent@),
+            r.key@.unwrap() == new,
     {
         let parent_ptr = self.map.get_ptr(&parent).unwrap();
 
@@ -223,8 +247,10 @@ impl LinSystem {
         self.generation = Ghost(self.generation@ + 1);
         let (_, child_ptr) = self.map.insert(new, node);
 
-        assert(self.map@ =~= old(self).map@
-            .insert(new@, (child_ptr.addr(), MemContents::Init(node))));
+        assert(self.map@ =~= old(self).map@.insert(
+            new@,
+            (child_ptr.addr(), MemContents::Init(node)),
+        ));
 
         proof! {
             assert forall |key: <LinKey as View>::V|
@@ -300,30 +326,36 @@ impl LinSystem {
     }
 
     fn read_link(&self, link: LinLink) -> &LinNode
-    requires self.valid(link) && !link.is_null() && self.map.wf()
-    returns self.follow(link)
+        requires
+            self.valid(link) && !link.is_null() && self.map.wf(),
+        returns
+            self.follow(link),
     {
         proof!{ use_type_invariant(link); };
         self.map.read(PPtr::from_addr(link.inner), Ghost(link.key@.unwrap()))
     }
 
     spec fn update_parent_link(&self, child_link: LinLink) -> SpecMap
-    recommends self.valid(child_link) && !child_link.is_null()
+        recommends
+            self.valid(child_link) && !child_link.is_null(),
     {
         let parent_link = self.follow(child_link).parent;
         let parent_key = parent_link.key@.unwrap();
-        self@.insert(parent_key@, (self@[parent_key@].0, self@[parent_key@].1.insert(0, child_link.key@.unwrap())))
+        self@.insert(
+            parent_key@,
+            (self@[parent_key@].0, self@[parent_key@].1.insert(0, child_link.key@.unwrap())),
+        )
     }
 
     fn update_links(&mut self, child_link: LinLink)
-    requires
-        old(self).map.wf(),
-        old(self).locally_finite(),
-        exists |parent: <LinKey as View>::V| old(self).future_first_child_of(child_link, parent),
-        old(self).almost_correctly_linked(child_link.key@.unwrap()@),
-    ensures
-        self.wf(),
-        self@ == old(self).update_parent_link(child_link)
+        requires
+            old(self).map.wf(),
+            old(self).locally_finite(),
+            exists|parent: <LinKey as View>::V| old(self).future_first_child_of(child_link, parent),
+            old(self).almost_correctly_linked(child_link.key@.unwrap()@),
+        ensures
+            self.wf(),
+            self@ == old(self).update_parent_link(child_link),
     {
         proof!{ use_type_invariant(child_link); };
         let parent_link = self.read_link(child_link).parent;
@@ -361,7 +393,6 @@ impl LinSystem {
             self.map.untake(next_ptr, Ghost(next_key), next_node, Ghost(vacated));
             assert(next_node == self.follow(parent_node.child));
         }
-
         parent_node.child = child_link;
 
         proof!{ axiom_map_insert_same(self.map@, parent_key@, (parent_ptr.addr(), MemContents::Init(parent_node))); };
@@ -471,14 +502,14 @@ impl LinSystem {
     }
 
     fn insert_and_update(&mut self, data: KobjData, parent: LinKey, new: LinKey)
-    requires
-        new@ != parent@,
-        old(self).wf(),
-        old(self).map@.contains_key(parent@),
-        !old(self).map@.contains_key(new@),
-    ensures
-        self.wf(),
-        self@ == insert_child(old(self)@, parent, new, data)
+        requires
+            new@ != parent@,
+            old(self).wf(),
+            old(self).map@.contains_key(parent@),
+            !old(self).map@.contains_key(new@),
+        ensures
+            self.wf(),
+            self@ == insert_child(old(self)@, parent, new, data),
     {
         let child_link = self.insert(data, parent, new);
 
@@ -490,13 +521,15 @@ impl LinSystem {
 
         assert(child_link.key@.unwrap() == new);
 
-        assert(self.update_parent_link(child_link) ==
-            self@.insert(parent_key@, (self@[parent@].0, self@[parent@].1.insert(0, new))));
+        assert(self.update_parent_link(child_link) == self@.insert(
+            parent_key@,
+            (self@[parent@].0, self@[parent@].1.insert(0, new)),
+        ));
 
-        assert(self.update_parent_link(child_link) ==
-            old(self)@
-                .insert(new@, (data, Seq::empty()))
-                .insert(parent_key@, (self@[parent@].0, self@[parent@].1.insert(0, new))));
+        assert(self.update_parent_link(child_link) == old(self)@.insert(
+            new@,
+            (data, Seq::empty()),
+        ).insert(parent_key@, (self@[parent@].0, self@[parent@].1.insert(0, new))));
 
         assert(self.update_parent_link(child_link) =~= insert_child(old(self)@, parent, new, data));
 
@@ -505,24 +538,26 @@ impl LinSystem {
 }
 
 proof fn lemma_unchanged_children_rec(old: &LinSystem, new: &LinSystem, link: LinLink)
-requires
-    new.locally_finite(),
-    old.locally_finite(),
-    old.valid(link),
-    forall |key: <LinKey as View>::V| old.map@.contains_key(key) ==>
-        #[trigger] new.map@.contains_key(key),
-    forall |key: <LinKey as View>::V| old.map@.contains_key(key) ==>
-        #[trigger] new.map@[key].0 == old.map@[key].0,
-    forall |key: <LinKey as View>::V| old.map@.contains_key(key) ==>
-        new.node_at(key).next == #[trigger] old.node_at(key).next
-ensures horizontal_keys(new, link) == horizontal_keys(old, link)
-decreases horizontal_keys(old, link).len()
+    requires
+        new.locally_finite(),
+        old.locally_finite(),
+        old.valid(link),
+        forall|key: <LinKey as View>::V|
+            old.map@.contains_key(key) ==> #[trigger] new.map@.contains_key(key),
+        forall|key: <LinKey as View>::V|
+            old.map@.contains_key(key) ==> #[trigger] new.map@[key].0 == old.map@[key].0,
+        forall|key: <LinKey as View>::V|
+            old.map@.contains_key(key) ==> new.node_at(key).next == #[trigger] old.node_at(
+                key,
+            ).next,
+    ensures
+        horizontal_keys(new, link) == horizontal_keys(old, link),
+    decreases horizontal_keys(old, link).len(),
 {
     if link.is_null() {
         lemma_is_null_empty_keys(new, link);
         lemma_is_null_empty_keys(old, link);
-    }
-    else {
+    } else {
         assert(old.valid(link));
         let key = link.key@.unwrap();
         assert(new.map@.contains_key(key@));
@@ -546,8 +581,7 @@ decreases horizontal_keys(old, link).len()
 }
 
 #[via_fn]
-proof fn children_decreases_proof(this: &LinSystem, link: LinLink)
-{
+proof fn children_decreases_proof(this: &LinSystem, link: LinLink) {
     if !link.is_null() && !this.follow(link).next.is_null() {
         let node = this.follow(link);
         assert(this.node_conditions(node));
@@ -557,18 +591,16 @@ proof fn children_decreases_proof(this: &LinSystem, link: LinLink)
 }
 
 pub(crate) open spec fn horizontal_keys(this: &LinSystem, link: LinLink) -> Seq<LinKey>
-decreases this.follow(link).generation@
+    decreases this.follow(link).generation@,
     when this.locally_finite() && this.valid(link)
     via children_decreases_proof
 {
     if link.is_null() {
         Seq::empty()
-    }
-    else {
+    } else {
         if this.follow(link).next.is_null() {
             Seq::empty().insert(0, link.key@.unwrap())
-        }
-        else {
+        } else {
             let indirect = horizontal_keys(this, this.follow(link).next);
             Seq::insert(indirect, 0, link.key@.unwrap())
         }
@@ -576,12 +608,14 @@ decreases this.follow(link).generation@
 }
 
 proof fn lemma_is_null_empty_keys(this: &LinSystem, link: LinLink)
-requires link.is_null() && this.locally_finite() && this.valid(link)
-ensures horizontal_keys(this, link) == Seq::<LinKey>::empty()
+    requires
+        link.is_null() && this.locally_finite() && this.valid(link),
+    ensures
+        horizontal_keys(this, link) == Seq::<LinKey>::empty(),
 {
     if link.is_null() {
         assert(horizontal_keys(this, link) =~= Seq::<LinKey>::empty());
     }
 }
 
-}
+} // verus!

@@ -15,7 +15,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License version 2 for more details.
  */
-
 use core::cmp::Ordering;
 use core::fmt;
 use core::mem::size_of;
@@ -40,13 +39,7 @@ struct Node<K, V> {
 
 impl<K: Copy + Ord, V> Node<K, V> {
     fn new(key: K, value: V, prio: Wrapping<u32>) -> Self {
-        Node {
-            left: Nullable::null(),
-            right: Nullable::null(),
-            prio,
-            key,
-            value,
-        }
+        Node { left: Nullable::null(), right: Nullable::null(), prio, key, value }
     }
 
     fn into_value(self) -> V {
@@ -73,10 +66,7 @@ pub struct Treap<K: Copy + Ord, V> {
 impl<K: Copy + Ord, V> Treap<K, V> {
     /// Creates an empty treap
     pub const fn new() -> Self {
-        Treap {
-            root: Nullable::null(),
-            prio: Wrapping(314_159_265),
-        }
+        Treap { root: Nullable::null(), prio: Wrapping(314_159_265) }
     }
 
     /// Returns true if the treap has no elements
@@ -89,39 +79,30 @@ impl<K: Copy + Ord, V> Treap<K, V> {
         if let Some(r) = self.root.take_inner() {
             Self::remove_rec(r);
         }
-
         self.prio = Wrapping(314_159_265);
     }
 
-    fn do_search<'a, F>(node: &'a Nullable<Node<K, V>>, f: &F) -> Option<&'a V>
-    where
+    fn do_search<'a, F>(node: &'a Nullable<Node<K, V>>, f: &F) -> Option<&'a V> where
         F: Fn(&V) -> bool,
-    {
+     {
         if node.is_null() {
             return None
         }
-
         let valid_node = node.read();
 
         if let Some(matched_value) = Self::do_search(&valid_node.left, f) {
             return Some(matched_value);
         }
-
         if f(&valid_node.value) {
             return Some(&valid_node.value);
         }
-
         if let Some(matched_value) = Self::do_search(&valid_node.right, f) {
             return Some(matched_value);
         }
-
         None
     }
 
-    pub fn find<F>(&self, f: F) -> Option<&V>
-    where
-        F: Fn(&V) -> bool,
-    {
+    pub fn find<F>(&self, f: F) -> Option<&V> where F: Fn(&V) -> bool {
         Self::do_search(&self.root, &f)
     }
 
@@ -141,15 +122,13 @@ impl<K: Copy + Ord, V> Treap<K, V> {
         self.get_node(key).map(|n| &n.value)
     }
 
-    fn get_node<'a>(&'a self, key: &K) -> Option<&'a Node<K, V>>
-    {
+    fn get_node<'a>(&'a self, key: &K) -> Option<&'a Node<K, V>> {
         let mut node = &self.root;
 
         loop {
             if node.is_null() {
                 return None;
             }
-
             match key.cmp(&node.read().key) {
                 Ordering::Less => node = &node.read().left,
                 Ordering::Greater => node = &node.read().right,
@@ -170,10 +149,12 @@ impl<K: Copy + Ord, V> Treap<K, V> {
     fn do_insert(&mut self, mut node: Node<K, V>) {
         let mut q = &mut self.root;
         loop {
-            if q.is_null() { break; }
-
-            if q.read().prio >= self.prio { break }
-
+            if q.is_null() {
+                break ;
+            }
+            if q.read().prio >= self.prio {
+                break
+            }
             match node.key.cmp(&q.read().key) {
                 Ordering::Less => q = &mut q.read().left,
                 Ordering::Greater => q = &mut q.read().right,
@@ -191,19 +172,20 @@ impl<K: Copy + Ord, V> Treap<K, V> {
             let mut r = &mut node.right;
 
             loop {
-                if prev.is_null() { break }
-
+                if prev.is_null() {
+                    break
+                }
                 match node.key.cmp(&prev.read().key) {
                     Ordering::Less => {
                         *r = prev;
                         r = &mut prev.read().left;
                         prev = *r;
-                    }
+                    },
                     Ordering::Greater => {
                         *l = prev;
                         l = &mut prev.read().right;
                         prev = *l;
-                    }
+                    },
                     Ordering::Equal => panic!("Key does already exist"),
                 }
             }
@@ -212,7 +194,7 @@ impl<K: Copy + Ord, V> Treap<K, V> {
         *q = Nullable::new(node);
 
         // fibonacci hashing to spread the priorities very even in the 32-bit room
-        self.prio += Wrapping(0x9e37_79b9); // floor(2^32 / phi), with phi = golden ratio
+        self.prio += Wrapping(0x9e37_79b9);  // floor(2^32 / phi), with phi = golden ratio
     }
 
     /// Sets the given key to given value, either by inserting a new node or by updating the value
@@ -232,10 +214,13 @@ impl<K: Copy + Ord, V> Treap<K, V> {
     /// Removes the root element of the treap and returns the value
     #[cfg(later)]
     pub fn remove_root(&mut self) -> Option<V> {
-        self.root.map(|r| {
-            Self::remove_from(&mut self.root, r);
-            unsafe { Box::from_raw(r.as_ptr()).into_value() }
-        })
+        self.root.map(
+            |r|
+                {
+                    Self::remove_from(&mut self.root, r);
+                    unsafe { Box::from_raw(r.as_ptr()).into_value() }
+                },
+        )
     }
 
     /// Removes the element from the treap for the given key and returns the value
@@ -244,12 +229,13 @@ impl<K: Copy + Ord, V> Treap<K, V> {
         let mut p = &mut self.root;
 
         loop {
-            if p.is_null() { return None; }
-
+            if p.is_null() {
+                return None;
+            }
             match key.cmp(&p.read().key) {
                 Ordering::Less => p = &mut p.read().left,
                 Ordering::Greater => p = &mut p.read().right,
-                Ordering::Equal => break,
+                Ordering::Equal => break ,
             }
         }
 
@@ -259,18 +245,18 @@ impl<K: Copy + Ord, V> Treap<K, V> {
 
     #[verifier::external_body]
     fn remove_from(p: &mut Nullable<Node<K, V>>) {
-        if p.is_null() { return; }
+        if p.is_null() {
+            return ;
+        }
         let (hole, mut node) = p.take().into_hole();
 
         let (left, right) = (node.left.take(), node.right.take());
 
         if left.is_null() {
             *p = right;
-        }
-        else if right.is_null() {
+        } else if right.is_null() {
             *p = left;
-        }
-        else {
+        } else {
             // rotate with left
             if left.read().prio < right.read().prio {
                 let (left_hole, mut left) = left.into_hole();
@@ -283,9 +269,8 @@ impl<K: Copy + Ord, V> Treap<K, V> {
 
                 *p = left_hole.fill(left);
             }
-
             // rotate with right
-            else {
+             else {
                 let (right_hole, mut right) = right.into_hole();
 
                 node.right = right.left;
@@ -314,18 +299,17 @@ impl<K: Copy + Ord, V> Default for Treap<K, V> {
 impl<K: Copy + Ord, V> Drop for Treap<K, V> {
     #[verifier::external_body]
     fn drop(&mut self)
-    opens_invariants none
-    no_unwind
+        opens_invariants none
+        no_unwind
     {
         self.clear();
     }
 }
 
-fn print_rec<K, V>(node: &Node<K, V>, f: &mut fmt::Formatter<'_>) -> fmt::Result
-where
+fn print_rec<K, V>(node: &Node<K, V>, f: &mut fmt::Formatter<'_>) -> fmt::Result where
     K: Copy + Ord + fmt::Debug,
     V: fmt::Debug,
-{
+ {
     writeln!(f, "  {:?} -> {:?}", node.key, node.value)?;
     if let Some(l) = node.left.read_opt() {
         print_rec(l, f)?;
@@ -482,6 +466,7 @@ mod tests {
     fn test_alloc_size() {
         assert!(Treap::<(), ()>::alloc_size() > 0);
     }
-}
 
 }
+
+} // verus!
