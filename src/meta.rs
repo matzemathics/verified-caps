@@ -68,9 +68,12 @@ impl Meta {
         };
 
         let parent_ptr = self.map.get(&parent).unwrap();
+        let tracked parent_borrow = self.instance.borrow().borrow_token(parent, self.spec.borrow(), self.state.borrow());
+        assert(parent_ptr.addr() == parent_borrow.addr());
+        let next = parent_ptr.borrow(Tracked(parent_borrow)).child;
 
         let node = Node {
-            next: 0,
+            next,
             child: 0,
             back: parent_ptr.addr(),
             first_child: true
@@ -81,17 +84,27 @@ impl Meta {
 
         proof!{
             token.is_nonnull();
-            let inserted = LinkedNode { first_child: true, back: Some(parent), next: None, child: None };
+            let inserted = LinkedNode {
+                first_child: true,
+                back: Some(parent),
+                next: self.spec@.value()[parent].1.child,
+                child: None
+            };
             let new_map = self.spec@.value().insert(child, (token, inserted));
 
             assert(self.spec@.value()[parent].0.addr() == parent_ptr.addr());
+            if self.spec@.value()[parent].1.child.is_some() {
+                self.instance.borrow().contains_child(parent, self.spec.borrow());
+                assert(self.spec@.value().contains_key(self.spec@.value()[parent].1.child.unwrap()));
+                assert(self.spec@.value()[self.spec@.value()[parent].1.child.unwrap()].0.addr() == next);
+            }
             assert(token_invariant(new_map, child));
 
             self.instance.borrow().token_invariant(parent, self.spec.borrow());
             assert(token_invariant(self.spec@.value(), parent));
         };
 
-        let tracked parent_token = self.instance.borrow_mut().insert_first_child(
+        let tracked parent_token = self.instance.borrow_mut().insert_child(
             token, child, parent, self.spec.borrow_mut(), self.state.borrow_mut(), token);
 
         let parent_ptr = self.map.get(&parent).unwrap();
@@ -104,7 +117,7 @@ impl Meta {
                 let child_key = self.spec@.value()[parent].1.child;
                 if child_key.is_some() {
                     self.instance.borrow().token_invariant(parent, self.spec.borrow());
-                    self.instance.borrow().contains_child(parent, child_key.unwrap(), self.spec.borrow());
+                    self.instance.borrow().contains_child(parent, self.spec.borrow());
                     self.instance.borrow().addr_nonnull(child_key.unwrap(), self.spec.borrow());
                     assert(parent_node.child != 0);
                 }
@@ -125,7 +138,7 @@ impl Meta {
 
             assert(token_invariant(new_map, parent));
 
-            self.instance.borrow_mut().finish_insert_first(
+            self.instance.borrow_mut().finish_insert(
                 parent_token, child, parent, self.spec.borrow_mut(), self.state.borrow_mut(), parent_token);
 
             assert(self.spec@.value().dom() == self.map@.dom());

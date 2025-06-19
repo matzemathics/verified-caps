@@ -649,6 +649,15 @@ impl SysState {
             SysState::InsertNext { inserted, parent, child } => key == inserted,
         }
     }
+
+    pub open spec fn allow_broken_next_link(self, key: CapKey, target: CapKey) -> bool {
+        match self {
+            SysState::Clean => false,
+            SysState::InsertFirst { inserted, parent } => key == inserted,
+            SysState::InsertNext { inserted, parent, child } => key == inserted,
+            SysState::InsertFinish { inserted, parent } => false,
+        }
+    }
 }
 
 pub open spec fn back_link_condition<T>(state: SysState, map: Map<CapKey, (T, LinkedNode)>, key: CapKey) -> bool {
@@ -663,7 +672,21 @@ pub open spec fn back_link_condition<T>(state: SysState, map: Map<CapKey, (T, Li
                 true => map[back].1.child == Some(key),
                 false => map[back].1.next == Some(key)
             }
-    })
+        })
+    }
+}
+
+pub open spec fn next_link_condition<T>(state: SysState, map: Map<CapKey, (T, LinkedNode)>, key: CapKey) -> bool {
+    if map[key].1.next.is_none() { true }
+    else {
+        let next = map[key].1.next.unwrap();
+
+        next != key &&
+        map.contains_key(next) &&
+        (state.allow_broken_next_link(key, next) || {
+            map[next].1.back == Some(key) &&
+            map[next].1.first_child == false
+        })
     }
 }
 
@@ -723,15 +746,7 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     #[invariant]
     pub fn next_back(&self) -> bool {
         forall |key: CapKey| #[trigger] self.map.contains_key(key) ==>
-            (self.map[key].1.next.is_none() || {
-                let next = self.map[key].1.next.unwrap();
-
-                next != key &&
-                self.map.contains_key(next) && {
-                    &&& self.map[next].1.first_child == false
-                    &&& self.map[next].1.back == Some(key)
-                }
-            })
+            next_link_condition(self.state, self.map, key)
     }
 
     #[invariant]
@@ -780,12 +795,6 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     }
 
     property!{
-        contains_child(parent: CapKey, child: CapKey) {
-            assert(pre.map.contains_key(parent) && pre.map[parent].1.child == Some(child) ==> pre.map.contains_key(child));
-        }
-    }
-
-    property!{
         contains_next(parent: CapKey) {
             assert(pre.map.contains_key(parent) && pre.map[parent].1.next.is_some()
                 ==> (pre.map[parent].1.next.unwrap() != parent && pre.map.contains_key(pre.map[parent].1.next.unwrap())));
@@ -796,6 +805,13 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         contains_back(parent: CapKey) {
             assert(pre.map.contains_key(parent) && pre.map[parent].1.back.is_some()
                 ==> (pre.map[parent].1.back.unwrap() != parent && pre.map.contains_key(pre.map[parent].1.back.unwrap())));
+        }
+    }
+
+    property!{
+        contains_child(parent: CapKey) {
+            assert(pre.map.contains_key(parent) && pre.map[parent].1.child.is_some()
+                ==> (pre.map[parent].1.child.unwrap() != parent && pre.map.contains_key(pre.map[parent].1.child.unwrap())));
         }
     }
 
@@ -811,9 +827,19 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         }
     }
 
+    property!{
+        borrow_token(key: CapKey) {
+            require !pre.state.dom().contains(key);
+            require pre.map.contains_key(key);
+
+            assert(token_invariant(pre.map, key));
+            guard tokens >= [key => pre.map[key].0];
+        }
+    }
+
     transition!{
-        insert_first_child(t: T, key: CapKey, parent: CapKey) {
-            let inserted = LinkedNode { first_child: true, back: Some(parent), next: None, child: None };
+        insert_child(t: T, key: CapKey, parent: CapKey) {
+            let inserted = LinkedNode { first_child: true, back: Some(parent), next: pre.map[parent].1.child, child: None };
             let new_map = pre.map.insert(key, (t, inserted));
 
             require token_invariant(new_map, key);
@@ -840,14 +866,26 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     pub fn state_inv(&self) -> bool {
         match self.state {
             SysState::InsertFirst { inserted, parent } => {
-                let insert_node = LinkedNode { first_child: true, back: Some(parent), next: None, child: None };
+                let insert_node = LinkedNode {
+                    first_child: true,
+                    back: Some(parent),
+                    next: self.map[parent].1.child,
+                    child: None
+                };
+
                 self.map.contains_key(parent)
                 && self.map.contains_key(inserted)
                 && self.map[inserted].1 == insert_node
                 && inserted != parent
             }
             SysState::InsertFinish { inserted, parent } => {
-                let insert_node = LinkedNode { first_child: true, back: Some(parent), next: None, child: None };
+                let insert_node = LinkedNode {
+                    first_child: true,
+                    back: Some(parent),
+                    next: self.map[parent].1.child,
+                    child: None
+                };
+
                 self.map.contains_key(parent)
                 && self.map.contains_key(inserted)
                 && self.map[inserted].1 == insert_node
@@ -858,13 +896,23 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         }
     }
 
-    #[inductive(insert_first_child)]
-    fn insert_first_child_inductive(pre: Self, post: Self, t: T, key: CapKey, parent: CapKey) {
+    #[inductive(insert_child)]
+    fn insert_child_inductive(pre: Self, post: Self, t: T, key: CapKey, parent: CapKey) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+        assert(next_link_condition(post.state, post.map, key));
     }
 
     transition! {
-        finish_insert_first(p: T, inserted: CapKey, parent: CapKey) {
+        insert_child_fix_next(inserted: CapKey, parent: CapKey) {
+            require pre.state == SysState::InsertFirst { inserted, parent };
+        }
+    }
+
+    #[inductive(insert_child_fix_next)]
+    fn insert_child_fix_next_inductive(pre: Self, post: Self, inserted: CapKey, parent: CapKey) {}
+
+    transition! {
+        finish_insert(p: T, inserted: CapKey, parent: CapKey) {
             let (old, parent_node) = pre.map[parent];
             let new_map = pre.map.insert(parent, (p, LinkedNode { child: Some(inserted), ..parent_node }));
 
@@ -878,8 +926,8 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         }
     }
 
-    #[inductive(finish_insert_first)]
-    fn finish_insert_first_inductive(pre: Self, post: Self, p: T, inserted: CapKey, parent: CapKey) {
+    #[inductive(finish_insert)]
+    fn finish_insert_inductive(pre: Self, post: Self, p: T, inserted: CapKey, parent: CapKey) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
     }
 });
