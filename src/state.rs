@@ -667,11 +667,47 @@ pub ghost struct LinkedNode {
     pub first_child: bool,
 }
 
+pub ghost enum LinkState {
+    Null,
+    Unchanged(CapKey),
+    Taken(CapKey),
+    Fixed(CapKey),
+}
+
+impl LinkState {
+    pub open spec fn dom(&self) -> Set<CapKey> {
+        match self {
+            LinkState::Taken(key) => set![*key],
+            _ => set![],
+        }
+    }
+
+    pub open spec fn fixed(&self) -> bool {
+        match self {
+            LinkState::Null => true,
+            LinkState::Unchanged(_) => false,
+            LinkState::Taken(_) => false,
+            LinkState::Fixed(_) => true,
+        }
+    }
+
+    pub open spec fn key(&self) -> Option<CapKey> {
+        match self {
+            LinkState::Null => None,
+            LinkState::Unchanged(k) => Some(*k),
+            LinkState::Taken(k) => Some(*k),
+            LinkState::Fixed(k) => Some(*k),
+        }
+    }
+}
+
+#[allow(inconsistent_fields)]
 pub enum SysState {
     Clean,
     InsertFirst { inserted: CapKey, parent: CapKey },
     InsertNext { inserted: CapKey, parent: CapKey, next: CapKey },
     InsertFinish { inserted: CapKey, parent: CapKey },
+    RevokeSingle { key: CapKey, back: LinkState, next: LinkState, first_child: bool },
 }
 
 impl SysState {
@@ -681,6 +717,9 @@ impl SysState {
             SysState::InsertFirst { inserted, parent } => set![parent],
             SysState::InsertFinish { inserted, parent } => set![parent],
             SysState::InsertNext { inserted, parent, next } => set![parent, next],
+            SysState::RevokeSingle { key, back, next, first_child } => {
+                back.dom().union(next.dom()).insert(key)
+            },
         }
     }
 
@@ -690,6 +729,9 @@ impl SysState {
             SysState::InsertFirst { inserted, parent } => key == inserted,
             SysState::InsertFinish { inserted, parent } => key == inserted,
             SysState::InsertNext { inserted, parent, next: child } => key == inserted,
+            SysState::RevokeSingle { key: removed, back, next, first_child } => {
+                next == LinkState::Fixed(key) || key == removed
+            },
         }
     }
 
@@ -699,6 +741,9 @@ impl SysState {
             SysState::InsertFirst { inserted, parent } => key == inserted,
             SysState::InsertNext { inserted, parent, next: child } => key == inserted,
             SysState::InsertFinish { inserted, parent } => false,
+            SysState::RevokeSingle { key: removed, back, next, first_child } => {
+                (back == LinkState::Fixed(key) && !first_child) || key == removed
+            },
         }
     }
 
@@ -708,6 +753,9 @@ impl SysState {
             SysState::InsertFirst { inserted, parent } => false,
             SysState::InsertNext { inserted, parent, next } => false,
             SysState::InsertFinish { inserted, parent } => key == parent,
+            SysState::RevokeSingle { key: removed, back, next, first_child } => {
+                (back == LinkState::Fixed(key) && first_child) || key == removed
+            },
         }
     }
 }
@@ -794,6 +842,20 @@ pub open spec fn token_invariant<T: Token>(map: Map<CapKey, (T, LinkedNode)>, ke
     };
 
     map[key].0.cond(next, child, back, map[key].1.first_child)
+}
+
+pub open spec fn revoke_back_fixed<T>(map: Map<CapKey, (T, LinkedNode)>, key: CapKey) -> bool {
+    map[key].1.back == Option::<CapKey>::None || {
+        ||| (map[key].1.first_child && map[map[key].1.back.unwrap()].1.child == map[key].1.next)
+        ||| (!map[key].1.first_child && map[map[key].1.back.unwrap()].1.next == map[key].1.next)
+    }
+}
+
+pub open spec fn revoke_next_fixed<T>(map: Map<CapKey, (T, LinkedNode)>, key: CapKey) -> bool {
+    map[key].1.next == Option::<CapKey>::None || {
+        &&& map[key].1.first_child == map[map[key].1.next.unwrap()].1.first_child
+        &&& map[key].1.back == map[map[key].1.next.unwrap()].1.back
+    }
 }
 
 tokenized_state_machine!(LinkSystem<T: Token>{
@@ -978,6 +1040,15 @@ tokenized_state_machine!(LinkSystem<T: Token>{
                 && self.map[inserted].1 == insert_node
                 && self.map[parent].1.child == Some(next)
             }
+            SysState::RevokeSingle { key, back, next, first_child } => {
+                &&& self.map.contains_key(key)
+                &&& self.map[key].1.child.is_none()
+                &&& first_child <==> self.map[key].1.first_child
+                &&& back.key() == self.map[key].1.back
+                &&& next.key() == self.map[key].1.next
+                &&& back.fixed() <==> revoke_back_fixed(self.map, key)
+                &&& next.fixed() <==> revoke_next_fixed(self.map, key)
+            }
             _ => true
         }
     }
@@ -1043,6 +1114,112 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     #[inductive(finish_insert)]
     fn finish_insert_inductive(pre: Self, post: Self, p: T, inserted: CapKey, parent: CapKey) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+    }
+
+    transition! {
+        revoke_single(key: CapKey) {
+            require pre.state == SysState::Clean;
+            require pre.map.contains_key(key);
+            require pre.map[key].1.child == Option::<CapKey>::None;
+
+            withdraw tokens -= [key => pre.map[key].0];
+            let back = match pre.map[key].1.back {
+                None => LinkState::Null,
+                Some(back) => LinkState::Unchanged(back),
+            };
+            let next = match pre.map[key].1.next {
+                None => LinkState::Null,
+                Some(next) => LinkState::Unchanged(next),
+            };
+
+            update state = SysState::RevokeSingle { key, back, next, first_child: pre.map[key].1.first_child };
+            assert(token_invariant(pre.map, key));
+        }
+    }
+
+    #[inductive(revoke_single)]
+    fn revoke_single_inductive(pre: Self, post: Self, key: CapKey) {
+        assert(post.state.dom() =~= set![key]);
+        assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+    }
+
+    transition! {
+        revoke_take_back() {
+            let state = match pre.state {
+                SysState::RevokeSingle { key, next, back: LinkState::Unchanged(back), first_child } => {
+                    Some((key, next, back, first_child))
+                }
+                _ => None
+            };
+
+            require state.is_some();
+            let (key, next, back, first_child) = state.unwrap();
+
+            // update state = SysState::RevokeSingle { key, next, back: LinkState::Taken(back), first_child };
+
+            assert(pre.map.contains_key(back));
+            // assert(!pre.state.dom().contains(back));
+            // withdraw tokens -= [back => pre.map[back].0];
+        }
+    }
+
+    #[inductive(revoke_take_back)]
+    fn revoke_take_back_inductive(pre: Self, post: Self) {
+        assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+    }
+
+    transition! {
+        finish_revoke_single(removed: CapKey) {
+            require match pre.state {
+                SysState::RevokeSingle { key, back, next, first_child } => key == removed && back.fixed() && next.fixed(),
+                _ => false
+            };
+
+            update state = SysState::Clean;
+            update map = pre.map.remove(removed);
+        }
+    }
+
+    #[inductive(finish_revoke_single)]
+    fn finish_revoke_single_inductive(pre: Self, post: Self, removed: CapKey) {
+        assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+
+        assert(revoke_back_fixed(pre.map, removed));
+        assert(revoke_next_fixed(pre.map, removed));
+
+        let (back_link, next_link) = match pre.state {
+            SysState::RevokeSingle { back, next, .. } => (back, next),
+            _ => arbitrary()
+        };
+
+        if let LinkState::Fixed(back) = back_link {
+            assert(back == pre.map[removed].1.back.unwrap());
+            assert(next_link_condition(SysState::Clean, post.map, back));
+            assert(child_link_condition(SysState::Clean, post.map, back));
+        }
+
+        if let LinkState::Fixed(next) = next_link {
+            assert(next == pre.map[removed].1.next.unwrap());
+            assert(back_link_condition(SysState::Clean, post.map, next));
+        }
+
+        assert(post.next_back());
+        assert(post.child_back());
+        assert(post.back_link());
+
+        // assert forall |other: CapKey| post.map.contains_key(other)
+        // implies back_link_condition(SysState::Clean, post.map, other)
+        // by {
+        //     if post.map[other].1.back.is_some() {
+        //         let back = post.map[other].1.back.unwrap();
+        //         if back == key {
+        //             assert(next_link_condition(SysState::Clean, pre.map, key));
+        //             assert(child_link_condition(SysState::Clean, pre.map, key));
+        //         }
+        //         else {
+        //         }
+        //     }
+        // }
     }
 });
 
