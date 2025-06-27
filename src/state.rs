@@ -665,6 +665,7 @@ pub ghost struct LinkedNode {
     pub next: Option<CapKey>,
     pub child: Option<CapKey>,
     pub first_child: bool,
+    pub generation: nat,
 }
 
 pub ghost enum LinkState {
@@ -768,14 +769,18 @@ pub open spec fn back_link_condition<T>(
     if map[key].1.back.is_none() {
         true
     } else {
-        let back = map[key].1.back.unwrap();
-
-        back != key && map.contains_key(back) && (state.allow_broken_back_link(key, back) || {
-            match map[key].1.first_child {
-                true => map[back].1.child == Some(key),
-                false => map[back].1.next == Some(key),
-            }
-        })
+        let back = map[key].1.back.unwrap(); {
+            &&& back != key
+            &&& map.contains_key(back)
+            &&& map[key].1.first_child ==> map[key].1.generation > map[back].1.generation
+            &&& map[key].1.first_child || map[key].1.generation < map[back].1.generation
+            &&& (state.allow_broken_back_link(key, back) || {
+                match map[key].1.first_child {
+                    true => map[back].1.child == Some(key),
+                    false => map[back].1.next == Some(key),
+                }
+            })
+        }
     }
 }
 
@@ -787,11 +792,14 @@ pub open spec fn next_link_condition<T>(
     if map[key].1.next.is_none() {
         true
     } else {
-        let next = map[key].1.next.unwrap();
-
-        next != key && map.contains_key(next) && (state.allow_broken_next_link(key, next) || {
-            map[next].1.back == Some(key) && map[next].1.first_child == false
-        })
+        let next = map[key].1.next.unwrap(); {
+            &&& next != key
+            &&& map.contains_key(next)
+            &&& map[key].1.generation > map[next].1.generation
+            &&& (state.allow_broken_next_link(key, next) || {
+                map[next].1.back == Some(key) && map[next].1.first_child == false
+            })
+        }
     }
 }
 
@@ -803,11 +811,15 @@ pub open spec fn child_link_condition<T>(
     if map[key].1.child.is_none() {
         true
     } else {
-        let child = map[key].1.child.unwrap();
+        let child = map[key].1.child.unwrap(); {
+            &&& child != key
+            &&& map.contains_key(child)
+            &&& map[key].1.generation < map[child].1.generation
+            &&& (state.allow_broken_child_link(key, child) || {
+                map[child].1.back == Some(key) && map[child].1.first_child == true
+            })
+        }
 
-        child != key && map.contains_key(child) && (state.allow_broken_child_link(key, child) || {
-            map[child].1.back == Some(key) && map[child].1.first_child == true
-        })
     }
 }
 
@@ -866,6 +878,9 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         #[sharding(variable)]
         pub state: SysState,
 
+        #[sharding(variable)]
+        pub generation: nat,
+
         #[sharding(storage_map)]
         pub tokens: Map<CapKey, T>,
     }
@@ -877,8 +892,8 @@ tokenized_state_machine!(LinkSystem<T: Token>{
 
     #[invariant]
     pub fn token_invariant(&self) -> bool {
-        forall |key: CapKey| #[trigger] self.map.contains_key(key) ==>
-            token_invariant(self.map, key)
+        forall |key: CapKey| self.map.contains_key(key) ==>
+            #[trigger] token_invariant(self.map, key)
     }
 
     #[invariant]
@@ -915,6 +930,7 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             init map = Map::empty();
             init tokens = Map::empty();
             init state = SysState::Clean;
+            init generation = 1;
         }
     }
 
@@ -956,9 +972,27 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             #[trigger] self.map[key].0.addr() != 0
     }
 
+    #[invariant]
+    pub fn pos_generation(&self) -> bool {
+        self.generation > 0
+    }
+
+    #[invariant]
+    pub fn generation_bound(&self) -> bool {
+        forall |key: CapKey| self.map.contains_key(key) ==>
+            #[trigger] self.map[key].1.generation < self.generation
+    }
+
+    #[invariant]
+    pub fn next_back_unequal(&self) -> bool {
+        forall |key: CapKey| self.map.contains_key(key) ==>
+            self.map[key].1.back.is_none() || #[trigger] self.map[key].1.next != self.map[key].1.back
+    }
+
     property!{
         addr_nonnull(key: CapKey) {
-            assert(pre.map.contains_key(key) ==> pre.map[key].0.addr() != 0);
+            require pre.map.contains_key(key);
+            assert(pre.map[key].0.addr() != 0);
         }
     }
 
@@ -974,7 +1008,14 @@ tokenized_state_machine!(LinkSystem<T: Token>{
 
     transition!{
         insert_child(t: T, key: CapKey, parent: CapKey) {
-            let inserted = LinkedNode { first_child: true, back: Some(parent), next: pre.map[parent].1.child, child: None };
+            let inserted = LinkedNode {
+                first_child: true,
+                back: Some(parent),
+                next: pre.map[parent].1.child,
+                child: None,
+                generation: pre.generation
+            };
+
             let new_map = pre.map.insert(key, (t, inserted));
 
             require token_invariant(new_map, key);
@@ -994,6 +1035,7 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             }
 
             update map = new_map;
+            update generation = pre.generation + 1;
         }
     }
 
@@ -1005,7 +1047,8 @@ tokenized_state_machine!(LinkSystem<T: Token>{
                     first_child: true,
                     back: Some(parent),
                     next: self.map[parent].1.child,
-                    child: None
+                    child: None,
+                    generation: (self.generation - 1) as nat,
                 };
 
                 self.map.contains_key(parent)
@@ -1019,7 +1062,8 @@ tokenized_state_machine!(LinkSystem<T: Token>{
                     first_child: true,
                     back: Some(parent),
                     next: self.map[parent].1.child,
-                    child: None
+                    child: None,
+                    generation: (self.generation - 1) as nat
                 };
 
                 self.map.contains_key(parent)
@@ -1032,7 +1076,8 @@ tokenized_state_machine!(LinkSystem<T: Token>{
                     first_child: true,
                     back: Some(parent),
                     next: Some(next),
-                    child: None
+                    child: None,
+                    generation: (self.generation - 1) as nat
                 };
 
                 self.map.contains_key(parent) && self.map.contains_key(inserted) && self.map.contains_key(next)
@@ -1046,6 +1091,7 @@ tokenized_state_machine!(LinkSystem<T: Token>{
                 &&& first_child <==> self.map[key].1.first_child
                 &&& back.key() == self.map[key].1.back
                 &&& next.key() == self.map[key].1.next
+                &&& next.key().is_none() || next.key() != back.key()
                 &&& back.fixed() <==> revoke_back_fixed(self.map, key)
                 &&& next.fixed() <==> revoke_next_fixed(self.map, key)
             }
@@ -1057,6 +1103,14 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     fn insert_child_inductive(pre: Self, post: Self, t: T, key: CapKey, parent: CapKey) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
         assert(next_link_condition(post.state, post.map, key));
+
+        assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != key
+        implies token_invariant(post.map, other) && post.map[other].0.addr() != 0
+        by {
+            assert(post.map[other] == pre.map[other]);
+            assert(token_invariant(pre.map, other));
+            assert(pre.map[other].0.addr() != 0);
+        };
     }
 
     transition! {
@@ -1094,6 +1148,14 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     #[inductive(insert_child_finish_next)]
     fn insert_child_finish_next_inductive(pre: Self, post: Self, token: T, inserted: CapKey, parent: CapKey, next: CapKey) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+
+        assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != next
+        implies token_invariant(post.map, other) && post.map[other].0.addr() != 0
+        by {
+            assert(post.map[other] == pre.map[other]);
+            assert(token_invariant(pre.map, other));
+            assert(pre.map[other].0.addr() != 0);
+        };
     }
 
     transition! {
@@ -1114,6 +1176,14 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     #[inductive(finish_insert)]
     fn finish_insert_inductive(pre: Self, post: Self, p: T, inserted: CapKey, parent: CapKey) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+
+        assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != parent
+        implies token_invariant(post.map, other) && post.map[other].0.addr() != 0
+        by {
+            assert(post.map[other] == pre.map[other]);
+            assert(token_invariant(pre.map, other));
+            assert(pre.map[other].0.addr() != 0);
+        };
     }
 
     transition! {
@@ -1155,17 +1225,73 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             require state.is_some();
             let (key, next, back, first_child) = state.unwrap();
 
-            // update state = SysState::RevokeSingle { key, next, back: LinkState::Taken(back), first_child };
+            update state = SysState::RevokeSingle { key, next, back: LinkState::Taken(back), first_child };
 
             assert(pre.map.contains_key(back));
-            // assert(!pre.state.dom().contains(back));
-            // withdraw tokens -= [back => pre.map[back].0];
+            assert(!pre.state.dom().contains(back));
+
+            withdraw tokens -= [back => pre.map[back].0];
+            assert(token_invariant(pre.map, back));
         }
     }
 
     #[inductive(revoke_take_back)]
     fn revoke_take_back_inductive(pre: Self, post: Self) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+    }
+
+    transition! {
+        revoke_put_back(t: T) {
+            let state = match pre.state {
+                SysState::RevokeSingle { key, next, back: LinkState::Taken(back), first_child } => {
+                    Some((key, next, back, first_child))
+                }
+                _ => None
+            };
+
+            require state.is_some();
+            let (key, next, back, first_child) = state.unwrap();
+
+            let new_back = match first_child {
+                true => LinkedNode { child: pre.map[key].1.next, ..pre.map[back].1 },
+                false => LinkedNode { next: pre.map[key].1.next, ..pre.map[back].1 }
+            };
+
+            let new_map = pre.map.insert(back, (t, new_back));
+            require t.addr() == pre.map[back].0.addr();
+            require token_invariant(new_map, back);
+            assert(revoke_back_fixed(new_map, key));
+
+            deposit tokens += [back => t];
+            update state = SysState::RevokeSingle { key, next, back: LinkState::Fixed(back), first_child };
+            update map = new_map;
+        }
+    }
+
+    #[inductive(revoke_put_back)]
+    fn revoke_put_back_inductive(pre: Self, post: Self, t: T) {
+        assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+
+        assume(post.child_back());
+        assume(post.back_link());
+        assume(post.next_back_unequal());
+
+        let state = match pre.state {
+            SysState::RevokeSingle { key, next, back: LinkState::Taken(back), first_child } => {
+                Some((key, next, back, first_child))
+            }
+            _ => None
+        };
+
+        let (key, next, back, first_child) = state.unwrap();
+
+        assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != back
+        implies token_invariant(post.map, other) && post.map[other].0.addr() != 0
+        by {
+            assert(post.map[other] == pre.map[other]);
+            assert(token_invariant(pre.map, other));
+            assert(pre.map[other].0.addr() != 0);
+        };
     }
 
     transition! {
@@ -1206,6 +1332,14 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         assert(post.next_back());
         assert(post.child_back());
         assert(post.back_link());
+
+        assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != removed
+        implies token_invariant(post.map, other) && post.map[other].0.addr() != 0
+        by {
+            assert(post.map[other] == pre.map[other]);
+            assert(token_invariant(pre.map, other));
+            assert(pre.map[other].0.addr() != 0);
+        };
 
         // assert forall |other: CapKey| post.map.contains_key(other)
         // implies back_link_condition(SysState::Clean, post.map, other)

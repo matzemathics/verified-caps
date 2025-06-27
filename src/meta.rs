@@ -4,7 +4,7 @@ use vstd::{
     simple_pptr::{PPtr, PointsTo},
 };
 
-use crate::state::{CapKey, LinkSystem, SysState, Token};
+use crate::state::{revoke_back_fixed, CapKey, LinkSystem, SysState, Token};
 
 verus! {
 
@@ -38,6 +38,7 @@ struct Meta {
     instance: Tracked<LinkSystem::Instance<PointsTo<Node>>>,
     spec: Tracked<LinkSystem::map<PointsTo<Node>>>,
     state: Tracked<LinkSystem::state<PointsTo<Node>>>,
+    generation: Tracked<LinkSystem::generation<PointsTo<Node>>>,
 }
 
 impl Meta {
@@ -45,6 +46,7 @@ impl Meta {
         &&& self.state@.value() == SysState::Clean
         &&& self.spec@.instance_id() == self.instance@.id()
         &&& self.state@.instance_id() == self.instance@.id()
+        &&& self.generation@.instance_id() == self.instance@.id()
         &&& self.spec@.value().dom() == self.map@.dom()
         &&& forall|key: CapKey| #[trigger]
             self.map@.contains_key(key) ==> self.spec@.value()[key].0.addr()
@@ -91,6 +93,7 @@ impl Meta {
             parent,
             self.spec.borrow_mut(),
             self.state.borrow_mut(),
+            self.generation.borrow_mut(),
             token,
         );
 
@@ -153,13 +156,25 @@ impl Meta {
         let ptr = self.map.get(&key).unwrap();
         let node = ptr.take(Tracked(&mut token));
 
-        if node.next == 0 {
-            proof!{ self.lemma_next_null_imp_none(key, node); }
-        }
-        else { }
-
         if node.back == 0 {
             proof!{ self.lemma_back_null_imp_none(key, node); }
+        }
+        else {
+            let tracked tok = self.instance.borrow_mut().revoke_take_back(self.spec.borrow(), self.state.borrow_mut());
+            let back_ptr = PPtr::from_addr(node.back);
+            let mut back_node: Node = back_ptr.take(Tracked(&mut tok));
+
+            match node.first_child {
+                true => back_node.child = node.next,
+                false => back_node.next = node.next,
+            }
+
+            back_ptr.put(Tracked(&mut tok), back_node);
+            let tracked _ = self.instance.borrow_mut().revoke_put_back(tok, self.spec.borrow_mut(), self.state.borrow_mut(), tok);
+        }
+
+        if node.next == 0 {
+            proof!{ self.lemma_next_null_imp_none(key, node); }
         }
         else { }
     }
