@@ -4,7 +4,7 @@ use vstd::{
     simple_pptr::{PPtr, PointsTo},
 };
 
-use crate::state::{revoke_back_fixed, CapKey, LinkSystem, SysState, Token};
+use crate::state::{CapKey, LinkSystem, SysState, Token};
 
 verus! {
 
@@ -150,6 +150,9 @@ impl Meta {
         old(self).wf(),
         old(self).spec@.value().contains_key(key),
         old(self).spec@.value()[key].1.child.is_none()
+    ensures
+        self.wf(),
+        !self.spec@.value().contains_key(key)
     {
         let tracked token = self.instance.borrow_mut().revoke_single(key, self.spec.borrow(), self.state.borrow_mut());
 
@@ -176,7 +179,24 @@ impl Meta {
         if node.next == 0 {
             proof!{ self.lemma_next_null_imp_none(key, node); }
         }
-        else { }
+        else { 
+            let tracked tok = self.instance.borrow_mut().revoke_take_next(self.spec.borrow(), self.state.borrow_mut());
+            let next_ptr = PPtr::<Node>::from_addr(node.next);
+            let mut next_node = next_ptr.take(Tracked(&mut tok));
+
+            next_node.back = node.back;
+            next_node.first_child = node.first_child;
+
+            next_ptr.put(Tracked(&mut tok), next_node);
+            let tracked _ = self.instance.borrow_mut().revoke_put_next(
+                tok, self.spec.borrow_mut(), self.state.borrow_mut(), tok);
+        }
+
+        self.map.remove(&key);
+
+        let tracked _ = self.instance.borrow_mut().finish_revoke_single(
+            key, self.spec.borrow_mut(), self.state.borrow_mut());
+        assert(self.spec@.value().dom() == self.map@.dom());
     }
 
     proof fn lemma_next_null_imp_none(tracked &self, key: CapKey, node: Node)

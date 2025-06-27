@@ -1241,6 +1241,33 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     }
 
     transition! {
+        revoke_take_next() {
+            let state = match pre.state {
+                SysState::RevokeSingle { key, next: LinkState::Unchanged(next), back, first_child } => {
+                    Some((key, next, back, first_child))
+                }
+                _ => None
+            };
+
+            require state.is_some();
+            let (key, next, back, first_child) = state.unwrap();
+
+            update state = SysState::RevokeSingle { key, next: LinkState::Taken(next), back, first_child };
+
+            assert(pre.map.contains_key(next));
+            assert(!pre.state.dom().contains(next));
+
+            withdraw tokens -= [next => pre.map[next].0];
+            assert(token_invariant(pre.map, next));
+        }
+    }
+
+    #[inductive(revoke_take_next)]
+    fn revoke_take_next_inductive(pre: Self, post: Self) {
+        assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+    }
+
+    transition! {
         revoke_put_back(t: T) {
             let state = match pre.state {
                 SysState::RevokeSingle { key, next, back: LinkState::Taken(back), first_child } => {
@@ -1295,6 +1322,60 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     }
 
     transition! {
+        revoke_put_next(t: T) {
+            let state = match pre.state {
+                SysState::RevokeSingle { key, next: LinkState::Taken(next), back, first_child } => {
+                    Some((key, next, back, first_child))
+                }
+                _ => None
+            };
+
+            require state.is_some();
+            let (key, next, back, first_child) = state.unwrap();
+
+            let new_next = LinkedNode {
+                back: pre.map[key].1.back,
+                first_child: pre.map[key].1.first_child,
+                ..pre.map[next].1
+            };
+
+            let new_map = pre.map.insert(next, (t, new_next));
+            require t.addr() == pre.map[next].0.addr();
+            require token_invariant(new_map, next);
+            assert(revoke_next_fixed(new_map, key));
+
+            deposit tokens += [next => t];
+            update state = SysState::RevokeSingle { key, next: LinkState::Fixed(next), back, first_child };
+            update map = new_map;
+        }
+    }
+
+    #[inductive(revoke_put_next)]
+    fn revoke_put_next_inductive(pre: Self, post: Self, t: T) {
+        assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+
+        assume(post.child_back());
+        assume(post.next_back());
+        assume(post.back_link());
+        assume(post.next_back_unequal());
+
+        let (key, next, back, first_child) = match pre.state {
+            SysState::RevokeSingle { key, next: LinkState::Taken(next), back, first_child } => {
+                (key, next, back, first_child)
+            }
+            _ => arbitrary()
+        };
+
+        assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != next
+        implies token_invariant(post.map, other) && post.map[other].0.addr() != 0
+        by {
+            assert(post.map[other] == pre.map[other]);
+            assert(token_invariant(pre.map, other));
+            assert(pre.map[other].0.addr() != 0);
+        };
+    }
+
+    transition! {
         finish_revoke_single(removed: CapKey) {
             require match pre.state {
                 SysState::RevokeSingle { key, back, next, first_child } => key == removed && back.fixed() && next.fixed(),
@@ -1340,20 +1421,6 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             assert(token_invariant(pre.map, other));
             assert(pre.map[other].0.addr() != 0);
         };
-
-        // assert forall |other: CapKey| post.map.contains_key(other)
-        // implies back_link_condition(SysState::Clean, post.map, other)
-        // by {
-        //     if post.map[other].1.back.is_some() {
-        //         let back = post.map[other].1.back.unwrap();
-        //         if back == key {
-        //             assert(next_link_condition(SysState::Clean, pre.map, key));
-        //             assert(child_link_condition(SysState::Clean, pre.map, key));
-        //         }
-        //         else {
-        //         }
-        //     }
-        // }
     }
 });
 
