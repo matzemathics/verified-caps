@@ -809,6 +809,21 @@ pub open spec fn next_link_condition<T>(
     }
 }
 
+pub open spec fn weak_next_link_condition<T>(
+    map: Map<CapKey, (T, LinkedNode)>,
+    key: CapKey,
+) -> bool {
+    if map[key].1.next.is_none() {
+        true
+    } else {
+        let next = map[key].1.next.unwrap(); {
+            &&& next != key
+            &&& map.contains_key(next)
+            &&& map[key].1.generation > map[next].1.generation
+        }
+    }
+}
+
 pub open spec fn child_link_condition<T>(
     state: SysState,
     map: Map<CapKey, (T, LinkedNode)>,
@@ -877,6 +892,49 @@ pub open spec fn revoke_next_fixed<T>(map: Map<CapKey, (T, LinkedNode)>, key: Ca
     map[key].1.next == Option::<CapKey>::None || {
         &&& map[key].1.parent == map[map[key].1.next.unwrap()].1.parent
         &&& map[key].1.back == map[map[key].1.next.unwrap()].1.back
+    }
+}
+
+pub open spec fn horizontally_connected<T>(map: Map<CapKey, (T, LinkedNode)>, key: CapKey, other: CapKey) -> bool
+decreases map[key].1.generation
+    when map.contains_key(key) && weak_next_link_condition(map, key)
+{
+    if key == other { true }
+    else {
+        map[key].1.next.is_some() &&
+        map.contains_key(map[key].1.next.unwrap()) &&
+        horizontally_connected(map, map[key].1.next.unwrap(), other)
+    }
+}
+
+proof fn stays_connected<T>(map: Map<CapKey, (T, LinkedNode)>, key: CapKey, other: CapKey, inserted: CapKey)
+requires
+    forall |key: CapKey| map.remove(inserted).contains_key(key) ==> #[trigger] weak_next_link_condition(map.remove(inserted), key),
+    map.remove(inserted).contains_key(key),
+    horizontally_connected(map.remove(inserted), key, other),
+ensures horizontally_connected(map, key, other)
+decreases map[key].1.generation
+{
+    if key == other {
+        assert(weak_next_link_condition(map.remove(inserted), key));
+        assert(weak_next_link_condition(map, key));
+        assert(horizontally_connected(map, key, other));
+    }
+    else {
+        assert(weak_next_link_condition(map, key));
+        assert(horizontally_connected(map.remove(inserted), key, other));
+
+        let next = map[key].1.next.unwrap();
+        assert(map.remove(inserted).contains_key(next));
+        stays_connected(map, next, other, inserted);
+
+        assert(weak_next_link_condition(map.remove(inserted), next));
+        assert(weak_next_link_condition(map, next));
+        assert(horizontally_connected(map, next, other));
+
+        assert(weak_next_link_condition(map.remove(inserted), key));
+        assert(weak_next_link_condition(map, key));
+        assert(horizontally_connected(map, key, other));
     }
 }
 
@@ -1066,23 +1124,12 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             let parent = self.map[key].1.parent.unwrap();
 
             self.map.contains_key(parent) &&
-            // ((self.state.allow_broken_back_link(key, parent) && self.map[key].1.first_child())
-            //     || (self.map[parent].1.child.is_some() && self.connected(self.map[parent].1.child.unwrap(), key))) &&
+            ((self.state.allow_broken_back_link(key, parent) && self.map[key].1.first_child())
+                || (self.map[parent].1.child.is_some() && horizontally_connected(self.map, self.map[parent].1.child.unwrap(), key))) &&
             self.map[parent].1.generation < self.map[key].1.generation
         }
     }
 
-    pub open spec fn connected(&self, key: CapKey, other: CapKey) -> bool
-    decreases self.map[key].1.generation
-        when self.map.contains_key(key) && next_link_condition(self.state, self.map, key)
-    {
-        if key == other { true }
-        else {
-            self.map[key].1.next.is_some() &&
-            self.map.contains_key(self.map[key].1.next.unwrap()) &&
-            self.connected(self.map[key].1.next.unwrap(), other)
-        }
-    }
 
     #[invariant]
     pub fn generation_parent(&self) -> bool {
@@ -1156,6 +1203,17 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             assert(post.map[other] == pre.map[other]);
             assert(token_invariant(pre.map, other));
             assert(pre.generation_parent_cond(other));
+            if pre.map[other].1.parent.is_some() {
+                let parent = pre.map[other].1.parent.unwrap();
+                let child = pre.map[parent].1.child.unwrap();
+                assert(horizontally_connected(pre.map, child, other));
+
+                assert(pre.map == post.map.remove(key));
+                stays_connected(post.map, child, other, key);
+
+                assert(horizontally_connected(post.map, child, other));
+            }
+            assert(post.generation_parent_cond(other));
             assert(pre.map[other].0.addr() != 0);
         };
     }
@@ -1398,26 +1456,6 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             assert(token_invariant(pre.map, other));
             assert(pre.generation_parent_cond(other));
             assert(pre.map[other].0.addr() != 0);
-
-            if pre.map[other].1.parent.is_some() {
-                let parent = pre.map[other].1.parent.unwrap();
-
-                //if parent == back {
-                //    if next.key() == Some(other) {
-                //        assert(post.generation_parent_cond(other));
-                //    }
-                //    else {
-                //        if first_child {
-                //            assert(post.map[back].1.child == next.key());
-                //            assert(next.key().is_some());
-                //        }
-                //        assert(post.map[back].1.child.is_some());
-                //        assert(pre.map[back].1.generation < pre.map[other].1.generation);
-                //    }
-                //}
-            }
-
-            assert(post.generation_parent_cond(other));
         };
     }
 
