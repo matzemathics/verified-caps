@@ -1061,6 +1061,35 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         }
     }
 
+    pub open spec fn generation_parent_cond(&self, key: CapKey) -> bool {
+        self.map[key].1.parent.is_none() || {
+            let parent = self.map[key].1.parent.unwrap();
+
+            self.map.contains_key(parent) &&
+            // ((self.state.allow_broken_back_link(key, parent) && self.map[key].1.first_child())
+            //     || (self.map[parent].1.child.is_some() && self.connected(self.map[parent].1.child.unwrap(), key))) &&
+            self.map[parent].1.generation < self.map[key].1.generation
+        }
+    }
+
+    pub open spec fn connected(&self, key: CapKey, other: CapKey) -> bool
+    decreases self.map[key].1.generation
+        when self.map.contains_key(key) && next_link_condition(self.state, self.map, key)
+    {
+        if key == other { true }
+        else {
+            self.map[key].1.next.is_some() &&
+            self.map.contains_key(self.map[key].1.next.unwrap()) &&
+            self.connected(self.map[key].1.next.unwrap(), other)
+        }
+    }
+
+    #[invariant]
+    pub fn generation_parent(&self) -> bool {
+        forall |key: CapKey| self.map.contains_key(key) ==>
+            #[trigger] self.generation_parent_cond(key)
+    }
+
     property!{
         addr_nonnull(key: CapKey) {
             require pre.map.contains_key(key);
@@ -1115,12 +1144,18 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     fn insert_child_inductive(pre: Self, post: Self, t: T, key: CapKey, parent: CapKey) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
         assert(next_link_condition(post.state, post.map, key));
+        assert(post.generation_parent_cond(key));
 
         assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != key
-        implies token_invariant(post.map, other) && post.map[other].0.addr() != 0
+        implies {
+            &&& token_invariant(post.map, other)
+            &&& post.map[other].0.addr() != 0
+            &&& post.generation_parent_cond(other)
+        }
         by {
             assert(post.map[other] == pre.map[other]);
             assert(token_invariant(pre.map, other));
+            assert(pre.generation_parent_cond(other));
             assert(pre.map[other].0.addr() != 0);
         };
     }
@@ -1139,6 +1174,10 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     #[inductive(insert_child_fix_next)]
     fn insert_child_fix_next_inductive(pre: Self, post: Self, inserted: CapKey, parent: CapKey) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+
+        assert forall |key: CapKey| post.map.contains_key(key)
+        implies #[trigger] post.generation_parent_cond(key)
+        by { assert(pre.generation_parent_cond(key)); }
     }
 
     transition! {
@@ -1162,10 +1201,15 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
 
         assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != next
-        implies token_invariant(post.map, other) && post.map[other].0.addr() != 0
+        implies {
+            &&& token_invariant(post.map, other)
+            &&& post.map[other].0.addr() != 0
+            &&& post.generation_parent_cond(other)
+        }
         by {
             assert(post.map[other] == pre.map[other]);
             assert(token_invariant(pre.map, other));
+            assert(pre.generation_parent_cond(other));
             assert(pre.map[other].0.addr() != 0);
         };
     }
@@ -1188,12 +1232,19 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     #[inductive(finish_insert)]
     fn finish_insert_inductive(pre: Self, post: Self, p: T, inserted: CapKey, parent: CapKey) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+        assert(pre.generation_parent_cond(parent));
+        assert(post.generation_parent_cond(parent));
 
         assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != parent
-        implies token_invariant(post.map, other) && post.map[other].0.addr() != 0
+        implies {
+            &&& token_invariant(post.map, other)
+            &&& post.map[other].0.addr() != 0
+            &&& post.generation_parent_cond(other)
+        }
         by {
             assert(post.map[other] == pre.map[other]);
             assert(token_invariant(pre.map, other));
+            assert(pre.generation_parent_cond(other));
             assert(pre.map[other].0.addr() != 0);
         };
     }
@@ -1223,6 +1274,10 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     fn revoke_single_inductive(pre: Self, post: Self, key: CapKey) {
         assert(post.state.dom() =~= set![key]);
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+
+        assert forall |key: CapKey| post.map.contains_key(key)
+        implies #[trigger] post.generation_parent_cond(key)
+        by { assert(pre.generation_parent_cond(key)); }
     }
 
     transition! {
@@ -1250,6 +1305,10 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     #[inductive(revoke_take_back)]
     fn revoke_take_back_inductive(pre: Self, post: Self) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+
+        assert forall |key: CapKey| post.map.contains_key(key)
+        implies #[trigger] post.generation_parent_cond(key)
+        by { assert(pre.generation_parent_cond(key)); }
     }
 
     transition! {
@@ -1277,6 +1336,10 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     #[inductive(revoke_take_next)]
     fn revoke_take_next_inductive(pre: Self, post: Self) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+
+        assert forall |key: CapKey| post.map.contains_key(key)
+        implies #[trigger] post.generation_parent_cond(key)
+        by { assert(pre.generation_parent_cond(key)); }
     }
 
     transition! {
@@ -1315,21 +1378,46 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         assume(post.back_link());
         assume(post.next_back_unequal());
 
-        let state = match pre.state {
+        let (key, next, back, first_child) = match pre.state {
             SysState::RevokeSingle { key, next, back: LinkState::Taken(back), first_child } => {
-                Some((key, next, back, first_child))
+                (key, next, back, first_child)
             }
-            _ => None
+            _ => arbitrary()
         };
 
-        let (key, next, back, first_child) = state.unwrap();
+        assume(post.generation_parent_cond(back));
 
         assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != back
-        implies token_invariant(post.map, other) && post.map[other].0.addr() != 0
+        implies {
+            &&& token_invariant(post.map, other)
+            &&& post.map[other].0.addr() != 0
+            &&& post.generation_parent_cond(other)
+        }
         by {
             assert(post.map[other] == pre.map[other]);
             assert(token_invariant(pre.map, other));
+            assert(pre.generation_parent_cond(other));
             assert(pre.map[other].0.addr() != 0);
+
+            if pre.map[other].1.parent.is_some() {
+                let parent = pre.map[other].1.parent.unwrap();
+
+                //if parent == back {
+                //    if next.key() == Some(other) {
+                //        assert(post.generation_parent_cond(other));
+                //    }
+                //    else {
+                //        if first_child {
+                //            assert(post.map[back].1.child == next.key());
+                //            assert(next.key().is_some());
+                //        }
+                //        assert(post.map[back].1.child.is_some());
+                //        assert(pre.map[back].1.generation < pre.map[other].1.generation);
+                //    }
+                //}
+            }
+
+            assert(post.generation_parent_cond(other));
         };
     }
 
@@ -1378,11 +1466,18 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             _ => arbitrary()
         };
 
+        assume(post.generation_parent_cond(next));
+
         assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != next
-        implies token_invariant(post.map, other) && post.map[other].0.addr() != 0
+        implies {
+            &&& token_invariant(post.map, other)
+            &&& post.map[other].0.addr() != 0
+            &&& post.generation_parent_cond(other)
+        }
         by {
             assert(post.map[other] == pre.map[other]);
             assert(token_invariant(pre.map, other));
+            assert(pre.generation_parent_cond(other));
             assert(pre.map[other].0.addr() != 0);
         };
     }
@@ -1422,11 +1517,13 @@ tokenized_state_machine!(LinkSystem<T: Token>{
 
             assert(next_link_condition(SysState::Clean, post.map, back));
             assert(child_link_condition(SysState::Clean, post.map, back));
+            assume(post.generation_parent_cond(back));
         }
 
         if let LinkState::Fixed(next) = next_link {
             assert(next == pre.map[removed].1.next.unwrap());
             assert(back_link_condition(SysState::Clean, post.map, next));
+            assume(post.generation_parent_cond(next));
         }
 
         assert(post.next_back());
@@ -1434,11 +1531,19 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         assert(post.back_link());
 
         assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != removed
-        implies token_invariant(post.map, other) && post.map[other].0.addr() != 0
+        implies {
+            &&& token_invariant(post.map, other)
+            &&& post.map[other].0.addr() != 0
+            &&& post.generation_parent_cond(other)
+        }
         by {
             assert(post.map[other] == pre.map[other]);
             assert(token_invariant(pre.map, other));
             assert(pre.map[other].0.addr() != 0);
+            assert(pre.generation_parent_cond(other));
+
+            assert(pre.map[other].1.parent != Some(removed));
+            assert(post.generation_parent_cond(other));
         };
     }
 });
