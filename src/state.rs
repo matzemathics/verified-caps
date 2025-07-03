@@ -1104,7 +1104,12 @@ tokenized_state_machine!(LinkSystem<T: Token>{
                 &&& self.map[key].1.child.is_none()
                 &&& first_child <==> self.map[key].1.first_child
                 &&& back.key() == self.map[key].1.back
+                &&& back.key().is_none() || back.fixed()
+                    || (first_child && self.map[back.key().unwrap()].1.child == Some(key))
+                    || (!first_child && self.map[back.key().unwrap()].1.next == Some(key))
                 &&& next.key() == self.map[key].1.next
+                &&& next.key().is_none() || next.fixed()
+                    || (!self.map[next.key().unwrap()].1.first_child && self.map[next.key().unwrap()].1.back == Some(key))
                 &&& next.key().is_none() || next.key() != back.key()
                 &&& back.fixed() <==> revoke_back_fixed(self.map, key)
                 &&& next.fixed() <==> revoke_next_fixed(self.map, key)
@@ -1314,10 +1319,6 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     fn revoke_put_back_inductive(pre: Self, post: Self, t: T) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
 
-        assume(post.child_back());
-        assume(post.back_link());
-        assume(post.next_back_unequal());
-
         let (key, next, back, first_child) = match pre.state {
             SysState::RevokeSingle { key, next, back: LinkState::Taken(back), first_child } => {
                 (key, next, back, first_child)
@@ -1325,8 +1326,30 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             _ => arbitrary()
         };
 
+        if first_child {
+            assert(pre.map[back].1.back == post.map[back].1.back);
+
+            if pre.map[back].1.back.is_some() {
+                let bback = pre.map[back].1.back.unwrap();
+                assert(back_link_condition(pre.state, pre.map, back));
+                assert(pre.map[bback].1.depth <= pre.map[back].1.depth);
+
+                assert(pre.map[back].1.depth < pre.map[key].1.depth);
+
+                if pre.map[key].1.next.is_some() {
+                    let next = pre.map[key].1.next.unwrap();
+                    assert(pre.map[next].1.depth == pre.map[key].1.depth);
+
+                    assert(next != bback);
+                }
+            }
+        }
+
         assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != back
-        implies token_invariant(post.map, other) && post.map[other].0.addr() != 0
+        implies {
+            &&& token_invariant(post.map, other)
+            &&& post.map[other].0.addr() != 0
+        }
         by {
             assert(post.map[other] == pre.map[other]);
             assert(token_invariant(pre.map, other));
@@ -1367,17 +1390,21 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     fn revoke_put_next_inductive(pre: Self, post: Self, t: T) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
 
-        assume(post.child_back());
-        assume(post.next_back());
-        assume(post.back_link());
-        assume(post.next_back_unequal());
-
         let (key, next, back, first_child) = match pre.state {
             SysState::RevokeSingle { key, next: LinkState::Taken(next), back, first_child } => {
                 (key, next, back, first_child)
             }
             _ => arbitrary()
         };
+
+        if pre.map[next].1.next.is_some() {
+            let nnext = pre.map[next].1.next.unwrap();
+            assert(next_link_condition(pre.state, pre.map, next));
+            assert(pre.map[next].1.back == Some(key));
+            assert(pre.map[key].1.index > pre.map[next].1.index);
+            assert(pre.map[next].1.index > pre.map[nnext].1.index);
+            assert(key != nnext);
+        }
 
         assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != next
         implies token_invariant(post.map, other) && post.map[other].0.addr() != 0
