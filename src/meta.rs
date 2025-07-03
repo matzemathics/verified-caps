@@ -38,7 +38,7 @@ struct Meta {
     instance: Tracked<LinkSystem::Instance<PointsTo<Node>>>,
     spec: Tracked<LinkSystem::map<PointsTo<Node>>>,
     state: Tracked<LinkSystem::state<PointsTo<Node>>>,
-    generation: Tracked<LinkSystem::generation<PointsTo<Node>>>,
+    generation: Tracked<LinkSystem::depth<PointsTo<Node>>>,
 }
 
 impl Meta {

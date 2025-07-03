@@ -665,7 +665,8 @@ pub ghost struct LinkedNode {
     pub next: Option<CapKey>,
     pub child: Option<CapKey>,
     pub first_child: bool,
-    pub generation: nat,
+    pub depth: nat,
+    pub index: nat,
 }
 
 pub ghost enum LinkState {
@@ -772,8 +773,8 @@ pub open spec fn back_link_condition<T>(
         let back = map[key].1.back.unwrap(); {
             &&& back != key
             &&& map.contains_key(back)
-            &&& map[key].1.first_child ==> map[key].1.generation > map[back].1.generation
-            &&& map[key].1.first_child || map[key].1.generation < map[back].1.generation
+            &&& map[key].1.first_child ==> map[key].1.depth == map[back].1.depth + 1
+            &&& map[key].1.first_child || (map[key].1.depth == map[back].1.depth && map[key].1.index < map[back].1.index)
             &&& (state.allow_broken_back_link(key, back) || {
                 match map[key].1.first_child {
                     true => map[back].1.child == Some(key),
@@ -795,7 +796,7 @@ pub open spec fn next_link_condition<T>(
         let next = map[key].1.next.unwrap(); {
             &&& next != key
             &&& map.contains_key(next)
-            &&& map[key].1.generation > map[next].1.generation
+            &&& map[key].1.depth == map[next].1.depth && map[key].1.index > map[next].1.index
             &&& (state.allow_broken_next_link(key, next) || {
                 map[next].1.back == Some(key) && map[next].1.first_child == false
             })
@@ -814,12 +815,21 @@ pub open spec fn child_link_condition<T>(
         let child = map[key].1.child.unwrap(); {
             &&& child != key
             &&& map.contains_key(child)
-            &&& map[key].1.generation < map[child].1.generation
+            &&& map[key].1.depth < map[child].1.depth
             &&& (state.allow_broken_child_link(key, child) || {
                 map[child].1.back == Some(key) && map[child].1.first_child == true
             })
         }
 
+    }
+}
+
+pub open spec fn next_index<T>(map: Map<CapKey, (T, LinkedNode)>, key: Option<CapKey>) -> nat {
+    if key.is_some() {
+        map[key.unwrap()].1.index + 1
+    }
+    else {
+        0
     }
 }
 
@@ -879,7 +889,7 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         pub state: SysState,
 
         #[sharding(variable)]
-        pub generation: nat,
+        pub depth: nat,
 
         #[sharding(storage_map)]
         pub tokens: Map<CapKey, T>,
@@ -930,7 +940,7 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             init map = Map::empty();
             init tokens = Map::empty();
             init state = SysState::Clean;
-            init generation = 1;
+            init depth = 1;
         }
     }
 
@@ -973,14 +983,14 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     }
 
     #[invariant]
-    pub fn pos_generation(&self) -> bool {
-        self.generation > 0
+    pub fn pos_depth(&self) -> bool {
+        self.depth > 0
     }
 
     #[invariant]
-    pub fn generation_bound(&self) -> bool {
+    pub fn depth_bound(&self) -> bool {
         forall |key: CapKey| self.map.contains_key(key) ==>
-            #[trigger] self.map[key].1.generation < self.generation
+            #[trigger] self.map[key].1.depth < self.depth
     }
 
     #[invariant]
@@ -1013,7 +1023,8 @@ tokenized_state_machine!(LinkSystem<T: Token>{
                 back: Some(parent),
                 next: pre.map[parent].1.child,
                 child: None,
-                generation: pre.generation
+                depth: pre.map[parent].1.depth + 1,
+                index: next_index(pre.map, pre.map[parent].1.child),
             };
 
             let new_map = pre.map.insert(key, (t, inserted));
@@ -1035,7 +1046,7 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             }
 
             update map = new_map;
-            update generation = pre.generation + 1;
+            update depth = vstd::math::max(pre.depth as int, inserted.depth + 1 as int) as nat;
         }
     }
 
@@ -1048,7 +1059,8 @@ tokenized_state_machine!(LinkSystem<T: Token>{
                     back: Some(parent),
                     next: self.map[parent].1.child,
                     child: None,
-                    generation: (self.generation - 1) as nat,
+                    depth: self.map[parent].1.depth + 1,
+                    index: next_index(self.map, self.map[parent].1.child),
                 };
 
                 self.map.contains_key(parent)
@@ -1063,7 +1075,8 @@ tokenized_state_machine!(LinkSystem<T: Token>{
                     back: Some(parent),
                     next: self.map[parent].1.child,
                     child: None,
-                    generation: (self.generation - 1) as nat
+                    depth: self.map[parent].1.depth + 1,
+                    index: next_index(self.map, self.map[parent].1.child),
                 };
 
                 self.map.contains_key(parent)
@@ -1077,7 +1090,8 @@ tokenized_state_machine!(LinkSystem<T: Token>{
                     back: Some(parent),
                     next: Some(next),
                     child: None,
-                    generation: (self.generation - 1) as nat
+                    depth: self.map[parent].1.depth + 1,
+                    index: next_index(self.map, self.map[parent].1.child),
                 };
 
                 self.map.contains_key(parent) && self.map.contains_key(inserted) && self.map.contains_key(next)
@@ -1105,7 +1119,8 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         assert(next_link_condition(post.state, post.map, key));
 
         assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != key
-        implies token_invariant(post.map, other) && post.map[other].0.addr() != 0
+        implies
+            token_invariant(post.map, other) && post.map[other].0.addr() != 0
         by {
             assert(post.map[other] == pre.map[other]);
             assert(token_invariant(pre.map, other));
@@ -1303,14 +1318,12 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         assume(post.back_link());
         assume(post.next_back_unequal());
 
-        let state = match pre.state {
+        let (key, next, back, first_child) = match pre.state {
             SysState::RevokeSingle { key, next, back: LinkState::Taken(back), first_child } => {
-                Some((key, next, back, first_child))
+                (key, next, back, first_child)
             }
-            _ => None
+            _ => arbitrary()
         };
-
-        let (key, next, back, first_child) = state.unwrap();
 
         assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != back
         implies token_invariant(post.map, other) && post.map[other].0.addr() != 0
