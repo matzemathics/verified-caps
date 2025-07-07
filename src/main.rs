@@ -22,6 +22,7 @@ mod ptr_map;
 mod state;
 #[cfg(disable)]
 mod treap;
+mod view;
 
 verus! {
 
