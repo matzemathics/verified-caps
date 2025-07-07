@@ -43,11 +43,15 @@ struct Meta {
 }
 
 impl Meta {
-    spec fn wf(&self) -> bool {
-        &&& self.state@.value() == SysState::Clean
+    spec fn ties(&self) -> bool {
         &&& self.spec@.instance_id() == self.instance@.id()
         &&& self.state@.instance_id() == self.instance@.id()
         &&& self.generation@.instance_id() == self.instance@.id()
+    }
+
+    spec fn wf(&self) -> bool {
+        &&& self.ties()
+        &&& self.state@.value() == SysState::Clean
         &&& self.spec@.value().dom() == self.map@.dom()
         &&& forall|key: CapKey| #[trigger]
             self.map@.contains_key(key) ==>
@@ -99,7 +103,7 @@ impl Meta {
 
         if parent_node.child == 0 {
             proof!{
-                self.lemma_child_null_imp_none(parent, parent_node);
+                self.lemma_child_null_imp_none(&parent_node);
             }
         } else {
             let tracked next_perm = self.instance.borrow_mut().insert_child_fix_next(
@@ -155,7 +159,7 @@ impl Meta {
         let node = ptr.take(Tracked(&mut token));
 
         if node.back == 0 {
-            proof!{ self.lemma_back_null_imp_none(key, node); }
+            proof!{ self.lemma_back_null_imp_none(&node); }
         }
         else {
             let tracked tok = self.instance.borrow_mut().revoke_take_back(self.spec.borrow(), self.state.borrow_mut());
@@ -172,7 +176,7 @@ impl Meta {
         }
 
         if node.next == 0 {
-            proof!{ self.lemma_next_null_imp_none(key, node); }
+            proof!{ self.lemma_next_null_imp_none(&node); }
         }
         else {
             let tracked tok = self.instance.borrow_mut().revoke_take_next(self.spec.borrow(), self.state.borrow_mut());
@@ -208,7 +212,7 @@ impl Meta {
             self.contains_key(key)
         {
             let child = self.first_child(key);
-            let tracked _ = self.lemma_child_null_imp_none(child.key, *child);
+            let tracked _ = self.lemma_child_null_imp_none(child);
 
             if child.key == key {
                 return
@@ -287,61 +291,54 @@ impl Meta {
         res
     }
 
-    proof fn lemma_next_null_imp_none(tracked &self, key: CapKey, node: Node)
+    proof fn lemma_next_null_imp_none(tracked &self, node: &Node)
     requires
         node.next == 0,
-        self.contains_key(key),
-        self.get(key) == node,
-        self.spec@.instance_id() == self.instance@.id(),
-        self.state@.instance_id() == self.instance@.id(),
+        self.contains(node),
+        self.ties()
     ensures
-        self.spec@.value()[key].1.next.is_none()
+        self.spec@.value()[node.key].1.next.is_none()
     {
-        // prove that key.next == None in this case
-        let next_key = self.spec@.value()[key].1.next;
+        let next_key = self.spec@.value()[node.key].1.next;
         if next_key.is_some() {
-            self.instance.borrow().token_invariant(key, self.spec.borrow());
-            self.instance.borrow().contains_next(key, self.spec.borrow());
+            self.instance.borrow().token_invariant(node.key, self.spec.borrow());
+            self.instance.borrow().contains_next(node.key, self.spec.borrow());
             self.instance.borrow().addr_nonnull(next_key.unwrap(), self.spec.borrow());
             assert(node.child != 0);
         }
     }
 
-    proof fn lemma_child_null_imp_none(tracked &self, key: CapKey, node: Node)
+    proof fn lemma_child_null_imp_none(tracked &self, node: &Node)
     requires
         node.child == 0,
-        self.contains_key(key),
-        self.get(key) == node,
-        self.spec@.instance_id() == self.instance@.id(),
-        self.state@.instance_id() == self.instance@.id(),
+        self.contains(node),
+        self.ties()
     ensures
-        self.spec@.value()[key].1.child.is_none()
+        self.spec@.value()[node.key].1.child.is_none()
     {
         // prove that key.child == None in this case
-        let child_key = self.spec@.value()[key].1.child;
+        let child_key = self.spec@.value()[node.key].1.child;
         if child_key.is_some() {
-            self.instance.borrow().token_invariant(key, self.spec.borrow());
-            self.instance.borrow().contains_child(key, self.spec.borrow());
+            self.instance.borrow().token_invariant(node.key, self.spec.borrow());
+            self.instance.borrow().contains_child(node.key, self.spec.borrow());
             self.instance.borrow().addr_nonnull(child_key.unwrap(), self.spec.borrow());
             assert(node.child != 0);
         }
     }
 
-    proof fn lemma_back_null_imp_none(tracked &self, key: CapKey, node: Node)
+    proof fn lemma_back_null_imp_none(tracked &self, node: &Node)
     requires
         node.back == 0,
-        self.contains_key(key),
-        self.get(key) == node,
-        self.spec@.instance_id() == self.instance@.id(),
-        self.state@.instance_id() == self.instance@.id(),
+        self.contains(node),
+        self.ties()
     ensures
-        self.spec@.value()[key].1.back.is_none()
+        self.spec@.value()[node.key].1.back.is_none()
     {
         // prove that key.back == None in this case
-        let back_key = self.spec@.value()[key].1.back;
+        let back_key = self.spec@.value()[node.key].1.back;
         if back_key.is_some() {
-            self.instance.borrow().token_invariant(key, self.spec.borrow());
-            self.instance.borrow().contains_back(key, self.spec.borrow());
+            self.instance.borrow().token_invariant(node.key, self.spec.borrow());
+            self.instance.borrow().contains_back(node.key, self.spec.borrow());
             self.instance.borrow().addr_nonnull(back_key.unwrap(), self.spec.borrow());
             assert(node.back != 0);
         }
