@@ -669,6 +669,8 @@ pub ghost struct LinkedNode {
     pub index: nat,
 }
 
+pub type LinkMap<T> = Map<CapKey, (T, LinkedNode)>;
+
 pub ghost enum LinkState {
     Null,
     Unchanged(CapKey),
@@ -764,7 +766,7 @@ impl SysState {
 
 pub open spec fn back_link_condition<T>(
     state: SysState,
-    map: Map<CapKey, (T, LinkedNode)>,
+    map: LinkMap<T>,
     key: CapKey,
 ) -> bool {
     if map[key].1.back.is_none() {
@@ -787,7 +789,7 @@ pub open spec fn back_link_condition<T>(
 
 pub open spec fn next_link_condition<T>(
     state: SysState,
-    map: Map<CapKey, (T, LinkedNode)>,
+    map: LinkMap<T>,
     key: CapKey,
 ) -> bool {
     if map[key].1.next.is_none() {
@@ -806,7 +808,7 @@ pub open spec fn next_link_condition<T>(
 
 pub open spec fn child_link_condition<T>(
     state: SysState,
-    map: Map<CapKey, (T, LinkedNode)>,
+    map: LinkMap<T>,
     key: CapKey,
 ) -> bool {
     if map[key].1.child.is_none() {
@@ -824,7 +826,7 @@ pub open spec fn child_link_condition<T>(
     }
 }
 
-pub open spec fn next_index<T>(map: Map<CapKey, (T, LinkedNode)>, key: Option<CapKey>) -> nat {
+pub open spec fn next_index<T>(map: LinkMap<T>, key: Option<CapKey>) -> nat {
     if key.is_some() {
         map[key.unwrap()].1.index + 1
     }
@@ -844,7 +846,7 @@ pub trait Token: Sized {
     spec fn cond(&self, next: usize, child: usize, back: usize, first_child: bool) -> bool;
 }
 
-pub open spec fn token_invariant<T: Token>(map: Map<CapKey, (T, LinkedNode)>, key: CapKey) -> bool {
+pub open spec fn token_invariant<T: Token>(map: LinkMap<T>, key: CapKey) -> bool {
     let next = if map[key].1.next.is_none() {
         0
     } else {
@@ -866,14 +868,14 @@ pub open spec fn token_invariant<T: Token>(map: Map<CapKey, (T, LinkedNode)>, ke
     map[key].0.cond(next, child, back, map[key].1.first_child)
 }
 
-pub open spec fn revoke_back_fixed<T>(map: Map<CapKey, (T, LinkedNode)>, key: CapKey) -> bool {
+pub open spec fn revoke_back_fixed<T>(map: LinkMap<T>, key: CapKey) -> bool {
     map[key].1.back == Option::<CapKey>::None || {
         ||| (map[key].1.first_child && map[map[key].1.back.unwrap()].1.child == map[key].1.next)
         ||| (!map[key].1.first_child && map[map[key].1.back.unwrap()].1.next == map[key].1.next)
     }
 }
 
-pub open spec fn revoke_next_fixed<T>(map: Map<CapKey, (T, LinkedNode)>, key: CapKey) -> bool {
+pub open spec fn revoke_next_fixed<T>(map: LinkMap<T>, key: CapKey) -> bool {
     map[key].1.next == Option::<CapKey>::None || {
         &&& map[key].1.first_child == map[map[key].1.next.unwrap()].1.first_child
         &&& map[key].1.back == map[map[key].1.next.unwrap()].1.back
@@ -883,7 +885,7 @@ pub open spec fn revoke_next_fixed<T>(map: Map<CapKey, (T, LinkedNode)>, key: Ca
 tokenized_state_machine!(LinkSystem<T: Token>{
     fields {
         #[sharding(variable)]
-        pub map: Map<CapKey, (T, LinkedNode)>,
+        pub map: LinkMap<T>,
 
         #[sharding(variable)]
         pub state: SysState,
