@@ -971,7 +971,8 @@ tokenized_state_machine!(LinkSystem<T: Token>{
 
     property!{
         contains_child(parent: CapKey) {
-            assert(pre.map.contains_key(parent) && pre.map[parent].1.child.is_some()
+            require pre.map.contains_key(parent);
+            assert(pre.map[parent].1.child.is_some()
                 ==> (pre.map[parent].1.child.unwrap() != parent && pre.map.contains_key(pre.map[parent].1.child.unwrap())));
         }
     }
