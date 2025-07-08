@@ -4,8 +4,8 @@ use vstd::{
 };
 
 use crate::state::{
-    back_link_condition, child_link_condition, next_link_condition, weak_next_link_condition,
-    CapKey, LinkMap, LinkedNode, SysState,
+    back_link_condition, child_link_condition, next_index, next_link_condition,
+    weak_next_link_condition, CapKey, LinkMap, LinkedNode, SysState,
 };
 
 verus! {
@@ -380,12 +380,8 @@ pub open spec fn view<T>(map: LinkMap<T>) -> CapMap {
     })
 }
 
-pub open spec fn safe_index<T>(map: LinkMap<T>, link: Option<CapKey>) -> nat {
-    if let Some(key) = link { map[key].1.index + 1 } else { 0 }
-}
-
 pub open spec fn siblings<T>(map: LinkMap<T>, link: Option<CapKey>) -> Seq<CapKey>
-decreases safe_index(map, link)
+decreases next_index(map, link)
     when {
         &&& forall |key: CapKey| #[trigger] map.contains_key(key) ==> weak_next_link_condition(map, key)
         &&& link.is_some() ==> map.contains_key(link.unwrap())
@@ -429,6 +425,107 @@ decreases i
         assert(b == siblings(map, Some(b.last())));
 
         lemma_ith_predecessor_univalent(map, a.last(), b.last(), i - 1, to);
+    }
+}
+
+pub open spec fn predecessor<T>(map: LinkMap<T>, node: CapKey, i: int) -> Option<CapKey> {
+    if exists |key: CapKey| ith_predecessor(map, key, i, node) {
+        Some(choose |key: CapKey| ith_predecessor(map, key, i, node))
+    }
+    else {
+        None
+    }
+}
+
+proof fn lemma_no_predecessor<T>(map: LinkMap<T>, node: CapKey, i: int, pred: CapKey)
+requires
+    forall |key: CapKey| #[trigger] map.contains_key(key) ==>
+        next_link_condition(SysState::Clean, map, key),
+    ith_predecessor(map, pred, i, node),
+    map.contains_key(pred),
+    map[node].1.first_child,
+    i > 0,
+ensures false
+decreases i
+{
+    if i == 1 { }
+    else {
+        let a = siblings(map, Some(pred)).drop_last();
+        assert(a[a.len() - i] == node);
+        assert(siblings(map, map[pred].1.next) == a);
+        assert(a == siblings(map, Some(a.last())));
+
+        lemma_no_predecessor(map, node, i - 1, a.last());
+    }
+}
+
+proof fn lemma_predecessor_transitive<T>(map: LinkMap<T>, a: CapKey, i: int, b: CapKey, j: int, c: CapKey)
+requires
+    forall |key: CapKey| #[trigger] map.contains_key(key) ==>
+        next_link_condition(SysState::Clean, map, key),
+    i >= 0,
+    ith_predecessor(map, a, i + j, c),
+    ith_predecessor(map, b, j, c),
+    map.contains_key(a),
+    map.contains_key(b),
+ensures
+    ith_predecessor(map, a, i, b),
+decreases i
+{
+    if i == 0 {
+        lemma_ith_predecessor_univalent(map, a, b, j, c);
+    }
+    else {
+        let a_prime = siblings(map, Some(a)).drop_last();
+        assert(a_prime[a_prime.len() - (i + j)] == c);
+        assert(siblings(map, map[a].1.next) == a_prime);
+        assert(a_prime == siblings(map, Some(a_prime.last())));
+
+        lemma_predecessor_transitive(map, a_prime.last(), i - 1, b, j, c);
+    }
+}
+
+pub open spec fn child_of<T>(map: LinkMap<T>, child: CapKey, parent: CapKey) -> bool {
+    siblings(map, map[parent].1.child).contains(child)
+}
+
+proof fn lemma_child_of_univalent<T>(map: LinkMap<T>, parent_a: CapKey, parent_b: CapKey, child: CapKey)
+requires
+    forall |key: CapKey| #[trigger] map.contains_key(key) ==> {
+        &&& next_link_condition(SysState::Clean, map, key)
+        &&& back_link_condition(SysState::Clean, map, key)
+        &&& child_link_condition(SysState::Clean, map, key)
+    },
+    child_of(map, child, parent_a),
+    child_of(map, child, parent_b),
+    map.contains_key(parent_a),
+    map.contains_key(parent_b),
+ensures
+    parent_a == parent_b
+{
+    let a = map[parent_a].1.child.unwrap();
+    let index_a = choose |i: int|
+        0 <= i < siblings(map, Some(a)).len() && siblings(map, Some(a))[i] == child;
+    let step_a = siblings(map, Some(a)).len() - index_a - 1;
+    assert(ith_predecessor(map, a, step_a, child));
+
+    let b = map[parent_b].1.child.unwrap();
+    let index_b = choose |i: int|
+        0 <= i < siblings(map, Some(b)).len() && siblings(map, Some(b))[i] == child;
+    let step_b = siblings(map, Some(b)).len() - index_b - 1;
+    assert(ith_predecessor(map, b, step_b, child));
+
+    if step_a == step_b {
+        lemma_ith_predecessor_univalent(map, a, b, step_a, child);
+    }
+    else if step_a > step_b {
+        lemma_predecessor_transitive(map, a, step_a - step_b, b, step_b, child);
+        lemma_no_predecessor(map, b, step_a - step_b, a);
+    }
+    else {
+        assert(step_b > step_a);
+        lemma_predecessor_transitive(map, b, step_b - step_a, a, step_a, child);
+        lemma_no_predecessor(map, a, step_b - step_a, b);
     }
 }
 
