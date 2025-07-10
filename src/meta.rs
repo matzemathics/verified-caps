@@ -4,7 +4,10 @@ use vstd::{
     simple_pptr::{PPtr, PointsTo},
 };
 
-use crate::state::{CapKey, LinkSystem, SysState, Token};
+use crate::{
+    state::{CapKey, LinkSystem, SysState, Token},
+    view::{CapNode, OpInsertChild},
+};
 
 verus! {
 
@@ -80,6 +83,8 @@ impl Meta {
         let node = Node { key: child, next, child: 0, back: parent_ptr.addr(), first_child: true };
 
         let (ptr, Tracked(token)) = PPtr::new(node);
+        let ghost op = OpInsertChild { parent, child, token };
+
         self.map.insert(child, ptr);
 
         proof!{
@@ -97,6 +102,8 @@ impl Meta {
             self.generation.borrow_mut(),
             token,
         );
+
+        assert(self.spec@.value() == op.child_update(old(self).spec@.value()));
 
         assert(parent_ptr.addr() == parent_token.addr());
         let mut parent_node = parent_ptr.take(Tracked(&mut parent_token));

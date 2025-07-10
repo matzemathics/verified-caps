@@ -178,12 +178,26 @@ pub open spec fn child_link_condition<T>(
         let child = map[key].1.child.unwrap(); {
             &&& child != key
             &&& map.contains_key(child)
-            &&& map[key].1.depth < map[child].1.depth
+            &&& map[key].1.depth + 1 == map[child].1.depth
             &&& (state.allow_broken_child_link(key, child) || {
                 map[child].1.back == Some(key) && map[child].1.first_child == true
             })
         }
+    }
+}
 
+pub open spec fn weak_child_link_condition<T>(
+    map: LinkMap<T>,
+    key: CapKey,
+) -> bool {
+    if map[key].1.child.is_none() {
+        true
+    } else {
+        let child = map[key].1.child.unwrap(); {
+            &&& child != key
+            &&& map.contains_key(child)
+            &&& map[key].1.depth + 1 == map[child].1.depth
+        }
     }
 }
 
