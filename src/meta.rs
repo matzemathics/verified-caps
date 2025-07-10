@@ -111,7 +111,8 @@ impl Meta {
         if parent_node.child == 0 {
             proof!{
                 self.lemma_child_null_imp_none(&parent_node);
-            }
+                assert(self.spec@.value() == op.next_update(op.child_update(old(self).spec@.value())));
+            };
         } else {
             let tracked next_perm = self.instance.borrow_mut().insert_child_fix_next(
                 child,
@@ -138,6 +139,8 @@ impl Meta {
                 self.state.borrow_mut(),
                 next_perm,
             );
+
+            assert(self.spec@.value() == op.next_update(op.child_update(old(self).spec@.value())));
         }
 
         parent_node.child = ptr.addr();
