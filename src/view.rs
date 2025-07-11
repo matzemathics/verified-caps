@@ -415,7 +415,7 @@ ensures siblings(map, None) == Seq::<CapKey>::empty()
     assert(siblings(map, None) == Seq::<CapKey>::empty()) by (compute_only);
 }
 
-proof fn lemma_siblings_unfold(map: LinkMap, key: CapKey)
+pub proof fn lemma_siblings_unfold(map: LinkMap, key: CapKey)
 requires
     weak_next_connected(map),
     map.contains_key(key)
@@ -581,6 +581,67 @@ decreases i
 
 pub open spec fn child_of(map: LinkMap, child: CapKey, parent: CapKey) -> bool {
     siblings(map, map[parent].child).contains(child)
+}
+
+proof fn lemma_siblings_depth(map: LinkMap, a: CapKey, b: CapKey)
+requires
+    siblings(map, Some(a)).contains(b),
+    weak_next_connected(map),
+    map.contains_key(a)
+ensures map[a].depth == map[b].depth
+decreases map[a].index
+{
+    lemma_siblings_unfold(map, a);
+
+    if a == b { }
+    else {
+        if let Some(next) = map[a].next {
+            assert(weak_next_link_condition(map, a));
+            lemma_siblings_depth(map, next, b);
+        }
+        else {
+            lemma_siblings_none_empty(map);
+        }
+    }
+}
+
+proof fn lemma_child_of_depth(map: LinkMap, child: CapKey, parent: CapKey)
+requires
+    child_of(map, child, parent),
+    weak_child_connected(map),
+    weak_next_connected(map),
+    map.contains_key(parent),
+ensures
+    map[child].depth == map[parent].depth + 1
+{
+    if let Some(first_child) = map[parent].child {
+        assert(weak_child_link_condition(map, parent));
+        lemma_siblings_depth(map, first_child, child);
+    }
+    else {
+        lemma_siblings_none_empty(map)
+    }
+}
+
+#[via_fn]
+proof fn transitive_child_of_decreases(map: LinkMap, child: CapKey, parent: CapKey)
+{
+    assert forall |node: CapKey| #[trigger] child_of(map, child, node)
+    implies map[child].depth > map[node].depth
+    by {
+        lemma_child_of_depth(map, child, node);
+    }
+}
+
+pub open spec fn transitive_child_of(map: LinkMap, child: CapKey, parent: CapKey) -> bool
+decreases map[child].depth
+when weak_child_connected(map) && weak_next_connected(map) && map.contains_key(parent)
+via transitive_child_of_decreases
+{
+    if child == parent { true }
+    else {
+        exists |node: CapKey| child_of(map, child, node) && transitive_child_of(map, node, parent)
+    }
 }
 
 proof fn lemma_child_of_univalent(map: LinkMap, parent_a: CapKey, parent_b: CapKey, child: CapKey)

@@ -5,8 +5,11 @@ use vstd::{
 };
 
 use crate::{
-    state::{CapKey, LinkSystem, SysState, Token},
-    view::{insert_child, view, OpInsertChild},
+    state::{weak_child_link_condition, CapKey, LinkSystem, SysState, Token},
+    view::{
+        child_of, insert_child, lemma_siblings_unfold, siblings, transitive_child_of, view,
+        OpInsertChild,
+    },
 };
 
 verus! {
@@ -280,34 +283,46 @@ impl Meta {
         self.tokens@.value()[key].value()
     }
 
-    fn first_child(&self, key: CapKey) -> (res: &Node)
+    fn first_child(&self, parent: CapKey) -> (res: &Node)
     requires
         self.wf(),
-        self.contains_key(key),
+        self.contains_key(parent),
     ensures
         res.child == 0,
-        self.contains(res)
+        self.contains(res),
+        transitive_child_of(self.spec@.value(), res.key, parent)
     {
-        let mut res = self.borrow_node(key);
-        let mut ptr = *self.map.get(&key).unwrap();
-        let ghost mut key = key;
+        let mut res = self.borrow_node(parent);
+        let mut ptr = *self.map.get(&parent).unwrap();
+        let ghost mut current = parent;
+        let tracked _ = self.instance.borrow().weak_connections(self.spec.borrow());
+        assert(transitive_child_of(self.spec@.value(), current, parent));
 
         while res.child != 0
         invariant
-            self.contains_key(key),
-            self.get(key) == *res,
-            self.tokens@.value()[key].addr() == ptr.addr(),
-            self.wf()
+            self.contains_key(current),
+            self.contains_key(parent),
+            self.get(current) == *res,
+            self.tokens@.value()[current].addr() == ptr.addr(),
+            self.wf(),
+            transitive_child_of(self.spec@.value(), current, parent)
         {
             proof! {
-                self.instance.borrow().contains_child(key, self.spec.borrow());
-                self.instance.borrow().token_invariant(key, self.spec.borrow(), self.tokens.borrow());
+                self.instance.borrow().contains_child(current, self.spec.borrow());
+                self.instance.borrow().token_invariant(current, self.spec.borrow(), self.tokens.borrow());
 
-                key = self.spec@.value()[key].child.unwrap();
-                self.instance.borrow().token_invariant(key, self.spec.borrow(), self.tokens.borrow());
+                let next_current = self.spec@.value()[current].child.unwrap();
+                self.instance.borrow().weak_connections(self.spec.borrow());
+                lemma_siblings_unfold(self.spec@.value(), next_current);
+                assert(weak_child_link_condition(self.spec@.value(), current));
+                assert(siblings(self.spec@.value(), Some(next_current)).last() == next_current);
+                assert(child_of(self.spec@.value(), next_current, current));
+                current = next_current;
+                assert(transitive_child_of(self.spec@.value(), current, parent));
+                self.instance.borrow().token_invariant(current, self.spec.borrow(), self.tokens.borrow());
             };
             let tracked token = self.instance.borrow().borrow_token(
-                key,
+                current,
                 self.spec.borrow(),
                 self.tokens.borrow(),
                 self.state.borrow(),
