@@ -210,6 +210,14 @@ pub open spec fn next_index(map: LinkMap, key: Option<CapKey>) -> nat {
     }
 }
 
+pub open spec fn weak_next_connected(map: LinkMap) -> bool {
+    forall |key: CapKey| map.contains_key(key) ==> #[trigger] weak_next_link_condition(map, key)
+}
+
+pub open spec fn weak_child_connected(map: LinkMap) -> bool {
+    forall |key: CapKey| map.contains_key(key) ==> #[trigger] weak_child_link_condition(map, key)
+}
+
 pub trait Token: Sized {
     spec fn addr(&self) -> usize;
 
@@ -356,6 +364,13 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             require pre.map.contains_key(parent);
             assert(pre.map[parent].child.is_some()
                 ==> (pre.map[parent].child.unwrap() != parent && pre.map.contains_key(pre.map[parent].child.unwrap())));
+        }
+    }
+
+    property!{
+        weak_connections() {
+            assert(weak_child_connected(pre.map));
+            assert(weak_next_connected(pre.map));
         }
     }
 

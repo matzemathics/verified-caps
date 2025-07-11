@@ -5,7 +5,8 @@ use vstd::{
 
 use crate::state::{
     back_link_condition, child_link_condition, next_index, next_link_condition,
-    weak_child_link_condition, weak_next_link_condition, CapKey, LinkMap, LinkedNode, SysState,
+    weak_child_connected, weak_child_link_condition, weak_next_connected, weak_next_link_condition,
+    CapKey, LinkMap, LinkedNode, SysState,
 };
 
 verus! {
@@ -364,13 +365,11 @@ pub open spec fn insert_child(
     map: CapMap,
     parent: CapKey,
     child: CapKey,
-    generation: nat,
 ) -> CapMap {
-    let parent_node = map[parent];
-    map.insert(
-        parent,
-        CapNode { children: parent_node.children.push(child), ..parent_node },
-    ).insert(child, CapNode { generation, children: Seq::empty() })
+    let CapNode { generation, children } = map[parent];
+    let parent_node = CapNode { children: children.push(child), generation };
+    let child_node = CapNode { generation: generation + 1, children: Seq::empty() };
+    map.insert(parent, parent_node).insert(child, child_node)
 }
 
 pub open spec fn view(map: LinkMap) -> CapMap {
@@ -386,12 +385,21 @@ impl LinkedNode {
     }
 }
 
+#[via_fn]
+proof fn siblings_decreases(map: LinkMap, link: Option<CapKey>)
+{
+    if let Some(key) = link {
+        assert(weak_next_link_condition(map, key))
+    }
+}
+
 pub open spec fn siblings(map: LinkMap, link: Option<CapKey>) -> Seq<CapKey>
 decreases next_index(map, link)
     when {
-        &&& forall |key: CapKey| #[trigger] map.contains_key(key) ==> weak_next_link_condition(map, key)
+        &&& weak_next_connected(map)
         &&& link.is_some() ==> map.contains_key(link.unwrap())
     }
+    via siblings_decreases
 {
     if let Some(key) = link {
         siblings(map, map[key].next).push(key)
@@ -409,17 +417,11 @@ ensures siblings(map, None) == Seq::<CapKey>::empty()
 
 proof fn lemma_siblings_unfold(map: LinkMap, key: CapKey)
 requires
-    forall |key: CapKey| #[trigger] map.contains_key(key) ==> weak_next_link_condition(map, key),
+    weak_next_connected(map),
     map.contains_key(key)
 ensures siblings(map, Some(key)) == siblings(map, map[key].next).push(key)
-{}
-
-pub open spec fn weak_next_connected(map: LinkMap) -> bool {
-    forall |key: CapKey| map.contains_key(key) ==> #[trigger] weak_next_link_condition(map, key)
-}
-
-pub open spec fn weak_child_connected(map: LinkMap) -> bool {
-    forall |key: CapKey| map.contains_key(key) ==> #[trigger] weak_child_link_condition(map, key)
+{
+    assert(weak_next_link_condition(map, key));
 }
 
 proof fn lemma_insert_siblings_unchanged(map: LinkMap, new: (CapKey, LinkedNode), key: CapKey)
@@ -658,6 +660,10 @@ impl OpInsertChild {
         }
     }
 
+    pub open spec fn update(&self, map: LinkMap) -> LinkMap {
+        self.parent_update(self.next_update(self.child_update(map)))
+    }
+
     pub open spec fn parent_update(&self, map: LinkMap) -> LinkMap {
         let parent_node = LinkedNode { child: Some(self.child), ..map[self.parent] };
         map.insert(self.parent,  parent_node)
@@ -667,10 +673,8 @@ impl OpInsertChild {
     requires
         !map.contains_key(self.child),
         map.contains_key(self.parent),
-        forall |key: CapKey| #[trigger] map.contains_key(key) ==> {
-            &&& weak_next_link_condition(map, key)
-            &&& weak_child_link_condition(map, key)
-        }
+        weak_next_connected(map),
+        weak_child_connected(map),
     ensures
         view(self.child_update(map)) == view(map).insert(self.child, self.insert_view_node(map))
     {
@@ -712,6 +716,7 @@ impl OpInsertChild {
             if map[key].child.is_none() { }
             else {
                 let child = map[key].child.unwrap();
+                assert(weak_child_link_condition(map, key));
                 assert(map.contains_key(child));
                 assert(siblings(map, Some(child)) == siblings(self.child_update(map), Some(child)));
             }
@@ -724,7 +729,6 @@ impl OpInsertChild {
     requires
         map.contains_key(self.parent),
         weak_next_connected(map),
-        weak_next_connected(self.next_update(map)),
         weak_child_connected(map),
     ensures
         view(self.next_update(map)) == view(map)
@@ -742,6 +746,7 @@ impl OpInsertChild {
                 }
                 else {
                     assert(weak_child_link_condition(map, key));
+                    self.lemma_invariants_update_next(map);
                     lemma_siblings_unchanged(map, self.next_update(map), map[key].child.unwrap());
                 }
             };
@@ -751,6 +756,130 @@ impl OpInsertChild {
             assert(view(self.next_update(map)) =~= view(map));
         }
     }
+
+    pub open spec fn invariants(&self, map: LinkMap) -> bool {
+        &&& map.contains_key(self.parent)
+        &&& weak_child_connected(map)
+        &&& weak_next_connected(map)
+    }
+
+    proof fn lemma_weak_next_update_child(&self, map: LinkMap)
+    requires self.invariants(map), !map.contains_key(self.child)
+    ensures weak_next_connected(self.child_update(map))
+    {
+        assert forall |key: CapKey| self.child_update(map).contains_key(key)
+        implies #[trigger] weak_next_link_condition(self.child_update(map), key)
+        by {
+            if key == self.child {
+                assert(weak_child_link_condition(map, self.parent));
+                assert(weak_next_link_condition(self.child_update(map), self.child));
+            }
+            else {
+                assert(weak_next_link_condition(map, key));
+            }
+        };
+    }
+
+    proof fn lemma_weak_child_update_child(&self, map: LinkMap)
+    requires self.invariants(map), !map.contains_key(self.child)
+    ensures weak_child_connected(self.child_update(map))
+    {
+        assert forall |key: CapKey| self.child_update(map).contains_key(key)
+        implies #[trigger] weak_child_link_condition(self.child_update(map), key)
+        by {
+            if key == self.child { }
+            else {
+                assert(weak_child_link_condition(map, key));
+            }
+        };
+    }
+
+    proof fn lemma_invariants_update_next(&self, map: LinkMap)
+    requires self.invariants(map)
+    ensures self.invariants(self.next_update(map))
+    {
+        assert forall |key: CapKey| #[trigger] self.next_update(map).contains_key(key)
+        implies {
+            &&& weak_next_link_condition(self.next_update(map), key)
+            &&& weak_child_link_condition(self.next_update(map), key)
+        }
+        by {
+            assert(weak_child_link_condition(map, self.parent));
+            assert(weak_next_link_condition(map, key));
+            assert(weak_child_link_condition(map, key));
+        };
+    }
+
+    proof fn lemma_invariants_update_parent(&self, map: LinkMap)
+    requires
+        self.invariants(map),
+        map.contains_key(self.child),
+        map[self.child].depth == map[self.parent].depth + 1
+    ensures self.invariants(self.parent_update(map))
+    {
+        assert forall |key: CapKey| #[trigger] self.parent_update(map).contains_key(key)
+        implies {
+            &&& weak_next_link_condition(self.parent_update(map), key)
+            &&& weak_child_link_condition(self.parent_update(map), key)
+        }
+        by {
+            assert(weak_next_link_condition(map, key));
+
+            if key == self.parent {
+                assert(weak_child_link_condition(self.parent_update(map), self.parent));
+            }
+            else {
+                assert(weak_child_link_condition(map, key));
+            };
+        };
+    }
+
+    pub proof fn lemma_view_update(&self, map: LinkMap)
+    requires
+        !map.contains_key(self.child),
+        self.invariants(map)
+    ensures
+        view(self.update(map)) == insert_child(view(map), self.parent, self.child)
+    {
+        self.lemma_view_child_update(map);
+        self.lemma_weak_next_update_child(map);
+        self.lemma_weak_child_update_child(map);
+        self.lemma_view_next_update(self.child_update(map));
+        self.lemma_invariants_update_next(self.child_update(map));
+
+        let checkpoint = self.next_update(self.child_update(map));
+        assert(view(checkpoint) == view(map).insert(self.child, self.insert_view_node(map)));
+
+        self.lemma_invariants_update_parent(checkpoint);
+        assert(weak_next_connected(self.update(map)));
+
+        assert forall |key: CapKey| self.update(map).contains_key(key)
+        implies #[trigger] siblings(checkpoint, Some(key)) == siblings(self.update(map), Some(key))
+        by {
+            lemma_siblings_unchanged(checkpoint, self.update(map), key);
+        }
+
+        lemma_siblings_unfold(self.update(map), self.child);
+        assert(siblings(self.update(map), Some(self.child)) == view(checkpoint)[self.parent].children.push(self.child));
+
+        assert forall |key: CapKey| self.update(map).contains_key(key) && key != self.parent
+        implies #[trigger] view(self.update(map))[key] == view(checkpoint)[key]
+        by {
+            assert(self.update(map)[key] == checkpoint[key]);
+            assert(weak_child_link_condition(checkpoint, key));
+        };
+
+        assert(weak_child_link_condition(self.update(map), self.parent));
+        let CapNode { generation, children } = view(map)[self.parent];
+        let parent_node = CapNode { generation, children: children.push(self.child) };
+        let child_node = CapNode { generation: generation + 1, children: Seq::empty() };
+        assert(view(self.update(map))[self.parent] == parent_node);
+
+        assert(view(checkpoint) == view(map).insert(self.child, child_node));
+        assert(view(self.update(map)) =~= view(checkpoint).insert(self.parent, parent_node));
+        assert(insert_child(view(map), self.parent, self.child) == view(map).insert(self.child, child_node).insert(self.parent, parent_node));
+    }
+
 }
 
 }
