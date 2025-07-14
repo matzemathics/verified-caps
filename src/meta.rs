@@ -7,7 +7,7 @@ use vstd::{
 use crate::{
     state::{weak_child_link_condition, CapKey, LinkSystem, SysState, Token},
     view::{
-        child_of, insert_child, lemma_siblings_unfold, siblings, transitive_child_of, view,
+        child_of, lemma_revoke_link_view, lemma_siblings_unfold, siblings, transitive_child_of,
         OpInsertChild,
     },
 };
@@ -74,16 +74,12 @@ impl Meta {
             old(self).wf(),
         ensures
             self.wf(),
-            self.spec@.value().dom() == old(self).spec@.value().dom().insert(child),
-            view(self.spec@.value()) == insert_child(view(old(self).spec@.value()), parent, child),
+            self.spec@.value() == (OpInsertChild {parent, child}).update(old(self).spec@.value()),
     {
         proof!{
             // needed later to show parent.next != child && parent.back != child
             self.instance.borrow().contains_back(parent, self.spec.borrow());
             self.instance.borrow().contains_next(parent, self.spec.borrow());
-
-            // needed later as precondition to OpInsertChild::lemma_update_view
-            self.instance.borrow().weak_connections(self.spec.borrow());
         };
 
         let parent_ptr = *self.map.get(&parent).unwrap();
@@ -161,9 +157,6 @@ impl Meta {
                 parent_token
             );
 
-            let ghost op = OpInsertChild { parent, child };
-            assert(self.spec@.value() == op.update(old(self).spec@.value()));
-            op.lemma_view_update(old(self).spec@.value());
             assert(self.spec@.value().dom() == self.map@.dom());
         };
     }
@@ -177,10 +170,11 @@ impl Meta {
         self.wf(),
         self.spec@.value().dom() == old(self).spec@.value().dom().remove(key)
     {
+        let tracked _ = self.instance.borrow().clean_links(self.spec.borrow(), self.state.borrow());
         let tracked token = self.instance.borrow_mut().revoke_single(
             key, self.spec.borrow(), self.tokens.borrow(), self.state.borrow_mut());
 
-        let ptr = self.map.get(&key).unwrap();
+        let ptr = *self.map.get(&key).unwrap();
         let node = ptr.take(Tracked(&mut token));
 
         if node.back == 0 {
@@ -222,6 +216,10 @@ impl Meta {
         }
 
         self.map.remove(&key);
+        ptr.free(Tracked(token));
+
+        assert(self.spec@.value().dom() == old(self).spec@.value().dom());
+        let tracked _ = lemma_revoke_link_view(old(self).spec@.value(), self.spec@.value(), key);
 
         let tracked _ = self.instance.borrow_mut().finish_revoke_single(
             key, self.spec.borrow_mut(), self.tokens.borrow_mut(), self.state.borrow_mut());

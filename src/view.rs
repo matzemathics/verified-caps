@@ -4,9 +4,9 @@ use vstd::{
 };
 
 use crate::state::{
-    back_link_condition, child_link_condition, next_index, next_link_condition,
-    weak_child_connected, weak_child_link_condition, weak_next_connected, weak_next_link_condition,
-    CapKey, LinkMap, LinkedNode, SysState,
+    back_link_condition, child_link_condition, clean_links, next_index, next_link_condition,
+    revoke_back_fixed, revoke_next_fixed, weak_child_connected, weak_child_link_condition,
+    weak_next_connected, weak_next_link_condition, CapKey, LinkMap, LinkedNode, SysState,
 };
 
 verus! {
@@ -646,11 +646,7 @@ via transitive_child_of_decreases
 
 proof fn lemma_child_of_univalent(map: LinkMap, parent_a: CapKey, parent_b: CapKey, child: CapKey)
 requires
-    forall |key: CapKey| #[trigger] map.contains_key(key) ==> {
-        &&& next_link_condition(SysState::Clean, map, key)
-        &&& back_link_condition(SysState::Clean, map, key)
-        &&& child_link_condition(SysState::Clean, map, key)
-    },
+    clean_links(map),
     child_of(map, child, parent_a),
     child_of(map, child, parent_b),
     map.contains_key(parent_a),
@@ -658,6 +654,7 @@ requires
 ensures
     parent_a == parent_b
 {
+    assert(next_link_condition(SysState::Clean, map, parent_a));
     let a = map[parent_a].child.unwrap();
     let index_a = choose |i: int|
         0 <= i < siblings(map, Some(a)).len() && siblings(map, Some(a))[i] == child;
@@ -682,6 +679,59 @@ ensures
         lemma_predecessor_transitive(map, b, step_b - step_a, a, step_a, child);
         lemma_no_predecessor(map, a, step_b - step_a, b);
     }
+}
+
+pub open spec fn get_parent(map: LinkMap, child: CapKey) -> Option<CapKey> {
+    if exists |parent: CapKey| map.contains_key(parent) && child_of(map, child, parent) {
+        Some(choose |parent: CapKey| map.contains_key(parent) && child_of(map, child, parent))
+    }
+    else {
+        None
+    }
+}
+
+pub proof fn lemma_parent_child(map: LinkMap, parent: CapKey, child: CapKey)
+requires
+    map.contains_key(parent),
+    child_of(map, child, parent),
+    forall |key: CapKey| #[trigger] map.contains_key(key) ==> {
+        &&& next_link_condition(SysState::Clean, map, key)
+        &&& back_link_condition(SysState::Clean, map, key)
+        &&& child_link_condition(SysState::Clean, map, key)
+    },
+ensures
+    get_parent(map, child) == Some(parent)
+{
+    lemma_child_of_univalent(map, get_parent(map, child).unwrap(), parent, child);
+}
+
+pub open spec fn revoke_single_view(before: LinkMap, removed: CapKey) -> CapMap {
+    if let Some(parent) = get_parent(before, removed) {
+        let parent_node = view(before)[parent];
+        let parent_node = CapNode { children: parent_node.children.remove_value(removed), ..parent_node };
+        view(before).insert(parent, parent_node)
+    }
+    else {
+        view(before)
+    }
+}
+
+pub open spec fn close_to(map: LinkMap, target: CapKey, key: CapKey) -> bool {
+    key == target || map[target].next == Some(key) || map[target].back == Some(key) || map[target].child == Some(key)
+}
+
+pub proof fn lemma_revoke_link_view(pre: LinkMap, post: LinkMap, removed: CapKey)
+requires
+    post.dom() == pre.dom(),
+    forall |key: CapKey| pre.contains_key(key) && !close_to(pre, removed, key) ==> #[trigger] pre[key] == post[key],
+    revoke_back_fixed(post, removed),
+    revoke_next_fixed(post, removed),
+    pre.contains_key(removed),
+    clean_links(pre),
+ensures
+    view(post) == revoke_single_view(pre, removed)
+{
+    admit()
 }
 
 pub ghost struct OpInsertChild {

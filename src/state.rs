@@ -265,6 +265,16 @@ pub open spec fn revoke_next_fixed(map: LinkMap, key: CapKey) -> bool {
     }
 }
 
+pub open spec fn clean_links(map: LinkMap) -> bool {
+    forall |key: CapKey|
+    #![trigger map[key].child] #![trigger map[key].next] #![trigger map[key].back]
+    map.contains_key(key) ==> {
+        &&& next_link_condition(SysState::Clean, map, key)
+        &&& back_link_condition(SysState::Clean, map, key)
+        &&& child_link_condition(SysState::Clean, map, key)
+    }
+}
+
 tokenized_state_machine!(LinkSystem<T: Token>{
     fields {
         #[sharding(variable)]
@@ -337,6 +347,13 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     #[inductive(empty)]
     fn empty_inductive(post: Self) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+    }
+
+    property!{
+        clean_links() {
+            require pre.state == SysState::Clean;
+            assert(clean_links(pre.map));
+        }
     }
 
     property!{
