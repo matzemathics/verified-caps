@@ -67,6 +67,22 @@ impl Meta {
                 self.get(key).key == key
     }
 
+    fn insert_root(&mut self, key: CapKey)
+    requires
+        !old(self).contains_key(key),
+        old(self).wf(),
+    ensures
+        self.wf()
+    {
+        let node = Node { next: 0, child: 0, back: 0, first_child: false, key };
+        let (ptr, Tracked(token)) = PPtr::new(node);
+
+        let tracked _ = token.is_nonnull();
+        let tracked _ = self.instance.borrow_mut().insert_root(key, token, self.spec.borrow_mut(), self.tokens.borrow_mut(), token);
+
+        self.map.insert(key, ptr);
+    }
+
     fn insert_child(&mut self, parent: CapKey, child: CapKey)
         requires
             old(self).contains_key(parent),

@@ -432,6 +432,38 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     }
 
     transition!{
+        insert_root(key: CapKey, token: T) {
+            let node = LinkedNode {
+                first_child: false,
+                back: None,
+                next: None,
+                child: None,
+                depth: 0,
+                index: 0,
+            };
+
+            require !pre.map.contains_key(key);
+            require token_invariant(pre.map.insert(key, node), pre.all_tokens.insert(key, token), key);
+            require token.addr() != 0;
+
+            update map = pre.map.insert(key, node);
+            update all_tokens = pre.all_tokens.insert(key, token);
+            deposit tokens += [key => token];
+        }
+    }
+
+    #[inductive(insert_root)]
+    fn insert_root_inductive(pre: Self, post: Self, key: CapKey, token: T) {
+        assert forall |key: CapKey| pre.map.contains_key(key)
+        implies #[trigger] token_invariant(post.map, post.all_tokens, key)
+        by {
+            assert(token_invariant(pre.map, pre.all_tokens, key));
+        };
+
+        assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+    }
+
+    transition!{
         insert_child(t: T, key: CapKey, parent: CapKey) {
             let inserted = LinkedNode {
                 first_child: true,
