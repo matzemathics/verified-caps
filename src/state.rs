@@ -53,9 +53,7 @@ impl LinkState {
 #[allow(inconsistent_fields)]
 pub enum SysState {
     Clean,
-    InsertFirst { inserted: CapKey, parent: CapKey },
-    InsertNext { inserted: CapKey, parent: CapKey, next: CapKey },
-    InsertFinish { inserted: CapKey, parent: CapKey },
+    InsertChild { inserted: CapKey, parent: CapKey, next: LinkState },
     RevokeSingle { key: CapKey, back: LinkState, next: LinkState, first_child: bool },
 }
 
@@ -63,9 +61,7 @@ impl SysState {
     pub open spec fn dom(self) -> Set<CapKey> {
         match self {
             SysState::Clean => Set::empty(),
-            SysState::InsertFirst { inserted, parent } => set![parent],
-            SysState::InsertFinish { inserted, parent } => set![parent],
-            SysState::InsertNext { inserted, parent, next } => set![parent, next],
+            SysState::InsertChild { inserted, parent, next } => next.dom().insert(parent),
             SysState::RevokeSingle { key, back, next, first_child } => {
                 back.dom().union(next.dom()).insert(key)
             },
@@ -75,9 +71,7 @@ impl SysState {
     pub open spec fn allow_broken_back_link(self, key: CapKey, target: CapKey) -> bool {
         match self {
             SysState::Clean => false,
-            SysState::InsertFirst { inserted, parent } => key == inserted,
-            SysState::InsertFinish { inserted, parent } => key == inserted,
-            SysState::InsertNext { inserted, parent, next: child } => key == inserted,
+            SysState::InsertChild { inserted, parent, next } => key == inserted,
             SysState::RevokeSingle { key: removed, back, next, first_child } => {
                 next == LinkState::Fixed(key) || key == removed
             },
@@ -87,9 +81,7 @@ impl SysState {
     pub open spec fn allow_broken_next_link(self, key: CapKey, target: CapKey) -> bool {
         match self {
             SysState::Clean => false,
-            SysState::InsertFirst { inserted, parent } => key == inserted,
-            SysState::InsertNext { inserted, parent, next: child } => key == inserted,
-            SysState::InsertFinish { inserted, parent } => false,
+            SysState::InsertChild { inserted, parent, next } => key == inserted && !next.fixed(),
             SysState::RevokeSingle { key: removed, back, next, first_child } => {
                 (back == LinkState::Fixed(key) && !first_child) || key == removed
             },
@@ -99,9 +91,7 @@ impl SysState {
     pub open spec fn allow_broken_child_link(self, key: CapKey, target: CapKey) -> bool {
         match self {
             SysState::Clean => false,
-            SysState::InsertFirst { inserted, parent } => false,
-            SysState::InsertNext { inserted, parent, next } => false,
-            SysState::InsertFinish { inserted, parent } => key == parent,
+            SysState::InsertChild { inserted, parent, next } => key == parent && next.fixed(),
             SysState::RevokeSingle { key: removed, back, next, first_child } => {
                 (back == LinkState::Fixed(key) && first_child) || key == removed
             },
@@ -485,11 +475,11 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             deposit tokens += [key => t];
             withdraw tokens -= [parent => pre.all_tokens[parent]];
 
-            if pre.map[parent].child == Option::<CapKey>::None {
-                update state = SysState::InsertFinish { inserted: key, parent };
-            }
-            else {
-                update state = SysState::InsertFirst { inserted: key, parent };
+            if pre.map[parent].child.is_some() {
+                let next = pre.map[parent].child.unwrap();
+                update state = SysState::InsertChild { inserted: key, parent, next: LinkState::Unchanged(next) };
+            } else {
+                update state = SysState::InsertChild { inserted: key, parent, next: LinkState::Null };
             }
 
             update map = new_map;
@@ -501,7 +491,7 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     #[invariant]
     pub fn state_inv(&self) -> bool {
         match self.state {
-            SysState::InsertFirst { inserted, parent } => {
+            SysState::InsertChild { inserted, parent, next } => {
                 let insert_node = LinkedNode {
                     first_child: true,
                     back: Some(parent),
@@ -511,41 +501,17 @@ tokenized_state_machine!(LinkSystem<T: Token>{
                     index: next_index(self.map, self.map[parent].child),
                 };
 
-                self.map.contains_key(parent)
-                && self.map.contains_key(inserted)
-                && self.map[inserted] == insert_node
-                && self.map[parent].child.is_some()
-                && inserted != parent
-            }
-            SysState::InsertFinish { inserted, parent } => {
-                let insert_node = LinkedNode {
-                    first_child: true,
-                    back: Some(parent),
-                    next: self.map[parent].child,
-                    child: None,
-                    depth: self.map[parent].depth + 1,
-                    index: next_index(self.map, self.map[parent].child),
-                };
-
-                self.map.contains_key(parent)
-                && self.map.contains_key(inserted)
-                && self.map[inserted] == insert_node
-                && inserted != parent
-            }
-            SysState::InsertNext { inserted, parent, next } => {
-                let insert_node = LinkedNode {
-                    first_child: true,
-                    back: Some(parent),
-                    next: Some(next),
-                    child: None,
-                    depth: self.map[parent].depth + 1,
-                    index: next_index(self.map, self.map[parent].child),
-                };
-
-                self.map.contains_key(parent) && self.map.contains_key(inserted) && self.map.contains_key(next)
-                && inserted != parent && inserted != next && parent != next
-                && self.map[inserted] == insert_node
-                && self.map[parent].child == Some(next)
+                {
+                    &&& self.map.contains_key(parent) && self.map[parent].child == next.key()
+                    &&& self.map.contains_key(inserted)
+                    &&& Some(inserted) != next.key()
+                    &&& self.map[inserted] == insert_node
+                    &&& inserted != parent
+                    &&& match next {
+                        LinkState::Fixed(next) => self.map[next].back == Some(inserted) && !self.map[next].first_child,
+                        _ => true
+                    }
+                }
             }
             SysState::RevokeSingle { key, back, next, first_child } => {
                 &&& self.map.contains_key(key)
@@ -583,11 +549,19 @@ tokenized_state_machine!(LinkSystem<T: Token>{
 
     transition! {
         insert_child_fix_next(inserted: CapKey, parent: CapKey) {
-            require pre.state == SysState::InsertFirst { inserted, parent };
-            let next = pre.map[parent].child.unwrap();
+            let next_link = match pre.state {
+                SysState::InsertChild { inserted: i, parent: p, next: LinkState::Unchanged(next) }
+                if i == inserted && p == parent => Some(next),
+                _ => None
+            };
+
+            require next_link.is_some();
+            assert(next_link == pre.map[parent].child);
+            let next = next_link.unwrap();
+
             withdraw tokens -= [next => pre.all_tokens[next]];
 
-            update state = SysState::InsertNext { inserted, parent, next };
+            update state = SysState::InsertChild { inserted, parent, next: LinkState::Taken(next) };
             assert(token_invariant(pre.map, pre.all_tokens, next));
         }
     }
@@ -603,12 +577,12 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             let new_map = pre.map
                 .insert(next, LinkedNode { back: Some(inserted), first_child: false, ..next_node});
 
-            require pre.state == SysState::InsertNext { inserted, parent, next };
+            require pre.state == SysState::InsertChild { inserted, parent, next: LinkState::Taken(next) };
             require token.addr() == pre.all_tokens[next].addr();
             require token_invariant(new_map, pre.all_tokens.insert(next, token), next);
 
             deposit tokens += [next => token];
-            update state = SysState::InsertFinish { inserted, parent };
+            update state = SysState::InsertChild { inserted, parent, next: LinkState::Fixed(next) };
             update map = new_map;
             update all_tokens = pre.all_tokens.insert(next, token);
         }
@@ -634,7 +608,12 @@ tokenized_state_machine!(LinkSystem<T: Token>{
 
             require p.addr() == pre.all_tokens[parent].addr();
             require token_invariant(new_map, pre.all_tokens.insert(parent, p), parent);
-            require pre.state == SysState::InsertFinish { inserted, parent };
+            require match pre.state {
+                SysState::InsertChild { inserted: i, parent: p, next } => {
+                    p == parent && i == inserted && next.fixed()
+                }
+                _ => false
+            };
 
             deposit tokens += [parent => p];
             update state = SysState::Clean;
