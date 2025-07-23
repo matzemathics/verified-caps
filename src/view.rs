@@ -1,3 +1,4 @@
+use alloc::collections::btree_map::Keys;
 use vstd::{
     prelude::*,
     seq::{axiom_seq_add_index1, axiom_seq_add_index2, axiom_seq_new_index},
@@ -720,18 +721,117 @@ pub open spec fn close_to(map: LinkMap, target: CapKey, key: CapKey) -> bool {
     key == target || map[target].next == Some(key) || map[target].back == Some(key) || map[target].child == Some(key)
 }
 
-pub proof fn lemma_revoke_link_view(pre: LinkMap, post: LinkMap, removed: CapKey)
+pub open spec fn revoke_back_update(pre: LinkMap, post: LinkMap, removed: CapKey) -> bool {
+    pre[removed].back == Option::<CapKey>::None || {
+        &&& {
+            ||| {
+                &&& pre[removed].first_child
+                &&& post[pre[removed].back.unwrap()].child == pre[removed].next
+                &&& post[pre[removed].back.unwrap()].next == pre[pre[removed].back.unwrap()].next
+            }
+            ||| {
+                &&& !pre[removed].first_child
+                &&& post[pre[removed].back.unwrap()].next == pre[removed].next
+                &&& post[pre[removed].back.unwrap()].child == pre[pre[removed].back.unwrap()].child
+            }
+        }
+
+        &&& post[pre[removed].back.unwrap()].back == pre[pre[removed].back.unwrap()].back
+        &&& post[pre[removed].back.unwrap()].first_child == pre[pre[removed].back.unwrap()].first_child
+    }
+}
+
+pub open spec fn revoke_next_update(pre: LinkMap, post: LinkMap, removed: CapKey) -> bool {
+    pre[removed].next == Option::<CapKey>::None || {
+        &&& post[pre[removed].next.unwrap()].back == pre[removed].back
+        &&& post[pre[removed].next.unwrap()].first_child == pre[removed].first_child
+
+        &&& post[pre[removed].next.unwrap()].next == pre[pre[removed].next.unwrap()].next
+        &&& post[pre[removed].next.unwrap()].child == pre[pre[removed].next.unwrap()].child
+    }
+}
+
+pub open spec fn sibling_of(map: LinkMap, a: CapKey, b: CapKey) -> bool {
+    get_parent(map, a) == get_parent(map, b)
+}
+
+proof fn lemma_sibling_of_next(map: LinkMap, key: CapKey)
 requires
-    post.dom() == pre.dom(),
-    forall |key: CapKey| pre.contains_key(key) && !close_to(pre, removed, key) ==> #[trigger] pre[key] == post[key],
-    revoke_back_fixed(post, removed),
-    revoke_next_fixed(post, removed),
-    pre.contains_key(removed),
-    clean_links(pre),
+    clean_links(map),
+    map.contains_key(key),
+    map[key].next.is_some()
 ensures
-    view(post) == revoke_single_view(pre, removed)
+    sibling_of(map, key, map[key].next.unwrap())
 {
     admit()
+}
+
+proof fn lemma_siblings_unchanged_local(pre: LinkMap, post: LinkMap, changed: CapKey, key: CapKey)
+requires
+    forall |key: CapKey| pre.contains_key(key) && !sibling_of(pre, changed, key) ==> #[trigger] pre[key].next == post[key].next,
+    !sibling_of(pre, changed, key),
+    clean_links(pre)
+ensures
+    siblings(pre, Some(key)) == siblings(post, Some(key))
+{
+    admit()
+}
+
+pub proof fn lemma_revoke_link_view(pre: LinkMap, post: LinkMap, removed: CapKey)
+requires
+    post.dom() == pre.dom().remove(removed),
+    clean_links(pre),
+    pre[removed].child.is_none(),
+    forall |key: CapKey| pre.contains_key(key) && !close_to(pre, removed, key) ==> #[trigger] pre[key] == post[key],
+    revoke_back_update(pre, post, removed),
+    revoke_next_update(pre, post, removed),
+    pre.contains_key(removed),
+ensures
+    view(post) == revoke_single_view(pre, removed).remove(removed)
+{
+    assert forall |key: CapKey| pre.contains_key(key) && !sibling_of(pre, removed, key)
+    implies #[trigger] pre[key].next == post[key].next
+    by {
+        if Some(key) == pre[removed].next {
+            lemma_sibling_of_next(pre, removed);
+        }
+        else if Some(key) == pre[removed].back {
+            if pre[removed].first_child {}
+            else {
+                assert(back_link_condition(SysState::Clean, pre, removed));
+                lemma_sibling_of_next(pre, key);
+            }
+        }
+        else if Some(key) == pre[removed].child { }
+        else { }
+    };
+
+    assert forall |parent: CapKey| !child_of(pre, removed, parent)
+    implies #[trigger] view(post)[parent] == view(pre)[parent]
+    by { admit() };
+
+    if let Some(parent) = get_parent(pre, removed) {
+        assume(view(post)[parent] == revoke_single_view(pre, removed)[parent]);
+    }
+
+    assert forall |key: CapKey| #[trigger] post.contains_key(key)
+    implies view(post)[key] == revoke_single_view(pre, removed).remove(removed)[key]
+    by {
+        if Some(key) == get_parent(pre, removed) {}
+        else {
+            assert(!child_of(pre, removed, key)) by {
+                if child_of(pre, removed, key) {
+                    if let Some(parent) = get_parent(pre, removed) {
+                        lemma_child_of_univalent(pre, key, parent, removed);
+                    }
+                }
+            };
+
+            assert(view(post)[key] == view(pre)[key]);
+        }
+    };
+
+    assert(view(post) =~= revoke_single_view(pre, removed).remove(removed));
 }
 
 pub ghost struct OpInsertChild {

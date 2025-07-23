@@ -235,10 +235,12 @@ impl Meta {
         ptr.free(Tracked(token));
 
         assert(self.spec@.value().dom() == old(self).spec@.value().dom());
-        let tracked _ = lemma_revoke_link_view(old(self).spec@.value(), self.spec@.value(), key);
 
         let tracked _ = self.instance.borrow_mut().finish_revoke_single(
             key, self.spec.borrow_mut(), self.tokens.borrow_mut(), self.state.borrow_mut());
+
+        let tracked _ = lemma_revoke_link_view(old(self).spec@.value(), self.spec@.value(), key);
+
         assert(self.spec@.value().dom() == self.map@.dom());
     }
 
