@@ -818,13 +818,32 @@ ensures
 
 proof fn lemma_siblings_unchanged_local(pre: LinkMap, post: LinkMap, changed: CapKey, key: CapKey)
 requires
-    forall |key: CapKey| pre.contains_key(key) && !sibling_of(pre, changed, key) ==> #[trigger] pre[key].next == post[key].next,
+    forall |key: CapKey| #![trigger sibling_of(pre, changed, key)]
+    pre.contains_key(key) && !sibling_of(pre, changed, key) ==> pre[key].next == post[key].next,
     !sibling_of(pre, changed, key),
+    pre.contains_key(key),
+    post.contains_key(key),
+    weak_next_connected(post),
     clean_links(pre)
 ensures
     siblings(pre, Some(key)) == siblings(post, Some(key))
+decreases pre[key].index
 {
-    admit()
+    assert(next_link_condition(SysState::Clean, pre, key));
+    lemma_siblings_unfold(pre, key);
+    lemma_siblings_unfold(post, key);
+
+    if let Some(next) = pre[key].next {
+        lemma_sibling_of_next(pre, key);
+        assert(weak_next_link_condition(post, key));
+
+        lemma_siblings_unchanged_local(pre, post, changed, next);
+        assert(siblings(pre, Some(key)) == siblings(post, Some(key)));
+    }
+    else {
+        lemma_siblings_none_empty(pre);
+        lemma_siblings_none_empty(post);
+    }
 }
 
 pub proof fn lemma_revoke_link_view(pre: LinkMap, post: LinkMap, removed: CapKey)
