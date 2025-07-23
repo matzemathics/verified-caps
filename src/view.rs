@@ -1,4 +1,3 @@
-use alloc::collections::btree_map::Keys;
 use vstd::{
     prelude::*,
     seq::{axiom_seq_add_index1, axiom_seq_add_index2, axiom_seq_new_index},
@@ -6,8 +5,8 @@ use vstd::{
 
 use crate::state::{
     back_link_condition, child_link_condition, clean_links, next_index, next_link_condition,
-    revoke_back_fixed, revoke_next_fixed, weak_child_connected, weak_child_link_condition,
-    weak_next_connected, weak_next_link_condition, CapKey, LinkMap, LinkedNode, SysState,
+    weak_child_connected, weak_child_link_condition, weak_next_connected, weak_next_link_condition,
+    CapKey, LinkMap, LinkedNode, SysState,
 };
 
 verus! {
@@ -425,6 +424,35 @@ ensures siblings(map, Some(key)) == siblings(map, map[key].next).push(key)
     assert(weak_next_link_condition(map, key));
 }
 
+pub proof fn lemma_siblings_take_n(map: LinkMap, key: CapKey, n: int)
+requires
+    map.contains_key(key),
+    weak_next_connected(map),
+    0 <= n < siblings(map, Some(key)).len(),
+ensures
+    map.contains_key(siblings(map, Some(key))[n]),
+    siblings(map, Some(key)).take(n + 1) == siblings(map, Some(siblings(map, Some(key))[n]))
+decreases
+    siblings(map, Some(key)).len() - n
+{
+    if n == siblings(map, Some(key)).len() - 1 {
+        lemma_siblings_unfold(map, key);
+        assert(siblings(map, Some(key)) == siblings(map, map[key].next).push(key));
+        assert(siblings(map, Some(key))[n] == key);
+        assert(siblings(map, Some(key)).take(n + 1) == siblings(map, Some(key)));
+    }
+    else {
+        lemma_siblings_take_n(map, key, n + 1);
+        let pred = siblings(map, Some(key))[n + 1];
+        assert(siblings(map, Some(key)).take(n + 1) == siblings(map, Some(pred)).drop_last());
+        lemma_siblings_unfold(map, pred);
+        assert(weak_next_link_condition(map, pred));
+        lemma_siblings_unfold(map, map[pred].next.unwrap());
+        assert(siblings(map, Some(pred)).drop_last().last() == map[pred].next.unwrap());
+        assert(siblings(map, Some(key)).take(n + 1) == siblings(map, map[pred].next))
+    }
+}
+
 proof fn lemma_insert_siblings_unchanged(map: LinkMap, new: (CapKey, LinkedNode), key: CapKey)
 requires
     !map.contains_key(new.0),
@@ -763,7 +791,29 @@ requires
 ensures
     sibling_of(map, key, map[key].next.unwrap())
 {
-    admit()
+    let next = map[key].next.unwrap();
+    lemma_siblings_unfold(map, key);
+    assert(ith_predecessor(map, key, 1, next));
+
+    if let Some(parent) = get_parent(map, key) {
+        assert(child_of(map, key, parent));
+        let child = map[parent].child.unwrap();
+        let index = siblings(map, Some(child)).index_of(key);
+
+        lemma_siblings_take_n(map, child, index);
+        assert(child_of(map, next, parent));
+
+        lemma_child_of_univalent(map, parent, get_parent(map, next).unwrap(), next);
+    }
+    else if let Some(alt_parent) = get_parent(map, next) {
+        let child = map[alt_parent].child.unwrap();
+        let index = siblings(map, Some(child)).index_of(next);
+
+        let step = siblings(map, Some(child)).len() - index - 1;
+        assert(ith_predecessor(map, child, step, next));
+
+        lemma_predecessor_transitive(map, child, step - 1, key, 1, next);
+    }
 }
 
 proof fn lemma_siblings_unchanged_local(pre: LinkMap, post: LinkMap, changed: CapKey, key: CapKey)
