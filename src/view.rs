@@ -766,6 +766,7 @@ pub open spec fn revoke_back_update(pre: LinkMap, post: LinkMap, removed: CapKey
 
         &&& post[pre[removed].back.unwrap()].back == pre[pre[removed].back.unwrap()].back
         &&& post[pre[removed].back.unwrap()].first_child == pre[pre[removed].back.unwrap()].first_child
+        &&& post[pre[removed].back.unwrap()].depth == pre[pre[removed].back.unwrap()].depth
     }
 }
 
@@ -776,6 +777,7 @@ pub open spec fn revoke_next_update(pre: LinkMap, post: LinkMap, removed: CapKey
 
         &&& post[pre[removed].next.unwrap()].next == pre[pre[removed].next.unwrap()].next
         &&& post[pre[removed].next.unwrap()].child == pre[pre[removed].next.unwrap()].child
+        &&& post[pre[removed].next.unwrap()].depth == pre[pre[removed].next.unwrap()].depth
     }
 }
 
@@ -850,6 +852,7 @@ pub proof fn lemma_revoke_link_view(pre: LinkMap, post: LinkMap, removed: CapKey
 requires
     post.dom() == pre.dom().remove(removed),
     clean_links(pre),
+    weak_next_connected(post),
     pre[removed].child.is_none(),
     forall |key: CapKey| pre.contains_key(key) && !close_to(pre, removed, key) ==> #[trigger] pre[key] == post[key],
     revoke_back_update(pre, post, removed),
@@ -875,9 +878,30 @@ ensures
         else { }
     };
 
-    assert forall |parent: CapKey| !child_of(pre, removed, parent)
+    assert forall |parent: CapKey| post.contains_key(parent) && !child_of(pre, removed, parent)
     implies #[trigger] view(post)[parent] == view(pre)[parent]
-    by { admit() };
+    by {
+        assert(pre[parent].depth == post[parent].depth);
+        assert(get_parent(pre, removed) != Some(parent));
+
+        if let Some(child) = pre[parent].child {
+            assert(child_of(pre, child, parent)) by {
+                lemma_siblings_unfold(pre, child);
+                assert(siblings(pre, pre[parent].child).last() == child);
+            };
+
+            assert(get_parent(pre, child) == Some(parent)) by {
+                lemma_child_of_univalent(pre, parent, get_parent(pre, child).unwrap(), child);
+            };
+
+            assert(!sibling_of(pre, child, removed));
+            lemma_siblings_unchanged_local(pre, post, removed, child);
+        }
+        else {
+            lemma_siblings_none_empty(pre);
+            lemma_siblings_none_empty(post);
+        }
+    };
 
     if let Some(parent) = get_parent(pre, removed) {
         assume(view(post)[parent] == revoke_single_view(pre, removed)[parent]);
