@@ -279,18 +279,103 @@ ensures
 
 proof fn lemma_siblings_jump(pre: LinkMap, post: LinkMap, start: CapKey, jump: CapKey)
 requires
-    forall |key: CapKey| post.contains_key(key) && key != jump ==> #[trigger] post[key].next == pre[key].next,
-    pre.contains_key(jump),
-    pre[jump].next.is_some(),
-    post.dom() == pre.dom().remove(pre[jump].next.unwrap()),
-    post[jump].next == pre[pre[jump].next.unwrap()].next,
-    siblings(pre, Some(start)).contains(jump),
     weak_next_connected(pre),
     weak_next_connected(post),
+    forall |key: CapKey| post.contains_key(key) && key != jump ==> #[trigger] post[key].next == pre[key].next,
+    pre.contains_key(jump),
+    pre.contains_key(start),
+    pre[jump].next.is_some(),
+    post.dom() == pre.dom().remove(pre[jump].next.unwrap()),
+
+    post[jump].next == pre[pre[jump].next.unwrap()].next,
+    siblings(pre, Some(start)).contains(jump),
 ensures
     siblings(post, Some(start)) == siblings(pre, Some(start)).remove_value(pre[jump].next.unwrap())
+decreases
+    pre[start].index
 {
-    admit()
+    let removed = pre[jump].next.unwrap();
+
+    if start == jump {
+        if let Some(next) = post[jump].next {
+            assert(weak_next_link_condition(post, jump));
+            assert(weak_next_link_condition(pre, jump));
+            assert(weak_next_link_condition(pre, pre[jump].next.unwrap()));
+
+            assert forall |after: CapKey| #[trigger] siblings(pre, Some(next)).contains(after)
+            implies post[after].next == pre[after].next
+            by {
+                lemma_siblings_contained(pre, Some(next), after);
+                lemma_siblings_decreasing(pre, removed, after);
+            };
+
+            lemma_siblings_unchanged_after(pre, post, next);
+        }
+
+        let critical = siblings(pre,post[jump].next);
+        assert(critical == siblings(post, post[jump].next));
+
+        if let Some(i) = critical.index_of_first(removed) {
+            siblings(pre, pre[removed].next).index_of_first_ensures(removed);
+            assert(siblings(pre, pre[removed].next)[i] == removed);
+            assert(siblings(pre, pre[removed].next).contains(removed));
+            lemma_siblings_decreasing(pre, removed, removed);
+            assert(false);
+        }
+
+        lemma_siblings_unfold(pre, jump);
+        lemma_siblings_unfold(pre, removed);
+        assert(siblings(pre, Some(jump)) == siblings(pre,post[jump].next).push(removed).push(jump));
+
+        assert(critical.index_of_first(removed).is_none());
+
+        assert(critical.push(removed).push(jump).index_of_first(removed) == Some(critical.len() as int)) by {
+            critical.push(removed).push(jump).index_of_first_ensures(removed);
+            assert(critical.push(removed).push(jump)[critical.len() as int] == removed);
+            let i = critical.push(removed).push(jump).index_of_first(removed).unwrap();
+            if i < critical.len() as int {
+                assert(critical[i] == removed);
+                assert(critical.contains(removed));
+                critical.index_of_first_ensures(removed);
+                assert(critical.index_of_first(removed).is_some());
+                assert(false);
+            }
+        };
+
+        assert(critical.push(removed).push(jump).remove_value(removed) == critical.push(jump));
+    }
+    else {
+        assert(weak_next_link_condition(pre, jump));
+        lemma_siblings_unfold(pre, start);
+        lemma_siblings_decreasing(pre, start, jump);
+        assert(removed != start);
+        lemma_siblings_unfold(post, start);
+
+        assert(weak_next_link_condition(pre, start));
+        assert(weak_next_link_condition(post, start));
+        let next = pre[start].next.unwrap();
+        lemma_siblings_jump(pre, post, next, jump);
+
+        assert(siblings(post, Some(next)) ==
+            siblings(pre, Some(next)).remove_value(pre[jump].next.unwrap()));
+
+        assert(siblings(post, Some(start)) == siblings(post, Some(next)).push(start));
+        assert(siblings(pre, Some(start)) == siblings(pre, Some(next)).push(start));
+
+        siblings(pre, Some(next)).push(start).index_of_first_ensures(removed);
+
+        let critical = siblings(pre, Some(next));
+
+        if critical.index_of_first(removed) != critical.push(start).index_of_first(removed) {
+            critical.index_of_first_ensures(removed);
+            critical.push(start).index_of_first_ensures(removed);
+            let a = critical.index_of_first(removed).unwrap();
+            assert(critical.push(start)[a] == removed);
+            assert(false);
+        }
+
+        assert(siblings(post, Some(start)) == siblings(pre, Some(start)).remove_value(removed));
+    }
 }
 
 pub open spec fn ith_predecessor(map: LinkMap, from: CapKey, i: int, to: CapKey) -> bool {
