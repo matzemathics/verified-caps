@@ -277,6 +277,22 @@ ensures
     }
 }
 
+proof fn lemma_siblings_jump(pre: LinkMap, post: LinkMap, start: CapKey, jump: CapKey)
+requires
+    forall |key: CapKey| post.contains_key(key) && key != jump ==> #[trigger] post[key].next == pre[key].next,
+    pre.contains_key(jump),
+    pre[jump].next.is_some(),
+    post.dom() == pre.dom().remove(pre[jump].next.unwrap()),
+    post[jump].next == pre[pre[jump].next.unwrap()].next,
+    siblings(pre, Some(start)).contains(jump),
+    weak_next_connected(pre),
+    weak_next_connected(post),
+ensures
+    siblings(post, Some(start)) == siblings(pre, Some(start)).remove_value(pre[jump].next.unwrap())
+{
+    admit()
+}
+
 pub open spec fn ith_predecessor(map: LinkMap, from: CapKey, i: int, to: CapKey) -> bool {
     let siblings = siblings(map, Some(from));
     0 <= i < siblings.len() && siblings[siblings.len() - i - 1] == to
@@ -627,6 +643,31 @@ decreases pre[key].index
     }
 }
 
+proof fn lemma_sib_back_some(map: LinkMap, start: CapKey, child: CapKey)
+requires
+    clean_links(map),
+    map.contains_key(start),
+    map.contains_key(child),
+    siblings(map, Some(start)).contains(child),
+    start != child,
+ensures
+    map[child].back.is_some()
+decreases
+    map[start].index
+{
+    lemma_siblings_unfold(map, start);
+    assert(next_link_condition(SysState::Clean, map, start));
+
+    if let Some(next) = map[start].next {
+        if next != child {
+            lemma_sib_back_some(map, next, child);
+        }
+    }
+    else {
+        lemma_siblings_none_empty(map);
+    }
+}
+
 pub proof fn lemma_revoke_link_view(pre: LinkMap, post: LinkMap, removed: CapKey)
 requires
     post.dom() == pre.dom().remove(removed),
@@ -640,20 +681,24 @@ requires
 ensures
     view(post) == revoke_single_view(pre, removed).remove(removed)
 {
+    assert forall |key: CapKey| post.contains_key(key) && pre[removed].back != Some(key)
+    implies #[trigger] pre[key].next == post[key].next
+    by {
+        if Some(key) == pre[removed].next { }
+        else if Some(key) == pre[removed].child { }
+        else { }
+    };
+
     assert forall |key: CapKey| pre.contains_key(key) && !sibling_of(pre, removed, key)
     implies #[trigger] pre[key].next == post[key].next
     by {
-        if Some(key) == pre[removed].next {
-            lemma_sibling_of_next(pre, removed);
-        }
-        else if Some(key) == pre[removed].back {
+        if Some(key) == pre[removed].back {
             if pre[removed].first_child {}
             else {
                 assert(back_link_condition(SysState::Clean, pre, removed));
                 lemma_sibling_of_next(pre, key);
             }
         }
-        else if Some(key) == pre[removed].child { }
         else { }
     };
 
@@ -732,12 +777,12 @@ ensures
                     assert(child_of(pre, removed, back));
                 }
                 assert(!pre[removed].first_child);
+
+                lemma_siblings_jump(pre, post, pre[parent].child.unwrap(), back);
             }
             else {
-                // cannot happen
+                lemma_sib_back_some(pre, pre[parent].child.unwrap(), removed);
             }
-
-            assume(view(post)[parent] == revoke_single_view(pre, removed)[parent]);
         }
     }
 
