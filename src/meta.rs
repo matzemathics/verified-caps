@@ -5,11 +5,11 @@ use vstd::{
 };
 
 use crate::{
-    state::{weak_child_link_condition, CapKey, LinkSystem, SysState, Token},
-    view::{
-        child_of, lemma_revoke_link_view, lemma_siblings_unfold, siblings, transitive_child_of,
-        OpInsertChild,
-    },
+    insert_view::OpInsertChild,
+    lemmas::{lemma_siblings_unfold, transitive_child_of},
+    revoke_view::lemma_revoke_link_view,
+    state::{weak_child_link_condition, LinkSystem, SysState, Token},
+    tcb::{child_of, revoke_single_parent_update, siblings, view, CapKey},
 };
 
 verus! {
@@ -62,23 +62,28 @@ impl Meta {
         &&& self.state@.value() == SysState::Clean
         &&& self.spec@.value().dom() == self.map@.dom()
         &&& forall|key: CapKey| #[trigger]
-            self.map@.contains_key(key) ==>
-                self.tokens@.value()[key].addr() == self.map@[key].addr() &&
-                self.get(key).key == key
+            self.map@.contains_key(key) ==> self.tokens@.value()[key].addr()
+                == self.map@[key].addr() && self.get(key).key == key
     }
 
     fn insert_root(&mut self, key: CapKey)
-    requires
-        !old(self).contains_key(key),
-        old(self).wf(),
-    ensures
-        self.wf()
+        requires
+            !old(self).contains_key(key),
+            old(self).wf(),
+        ensures
+            self.wf(),
     {
         let node = Node { next: 0, child: 0, back: 0, first_child: false, key };
         let (ptr, Tracked(token)) = PPtr::new(node);
 
         let tracked _ = token.is_nonnull();
-        let tracked _ = self.instance.borrow_mut().insert_root(key, token, self.spec.borrow_mut(), self.tokens.borrow_mut(), token);
+        let tracked _ = self.instance.borrow_mut().insert_root(
+            key,
+            token,
+            self.spec.borrow_mut(),
+            self.tokens.borrow_mut(),
+            token,
+        );
 
         self.map.insert(key, ptr);
     }
@@ -90,7 +95,7 @@ impl Meta {
             old(self).wf(),
         ensures
             self.wf(),
-            self.spec@.value() == (OpInsertChild {parent, child}).update(old(self).spec@.value()),
+            self.spec@.value() == (OpInsertChild { parent, child }).update(old(self).spec@.value()),
     {
         proof!{
             // needed later to show parent.next != child && parent.back != child
@@ -178,27 +183,36 @@ impl Meta {
     }
 
     fn revoke_single(&mut self, key: CapKey)
-    requires
-        old(self).wf(),
-        old(self).contains_key(key),
-        old(self).spec@.value()[key].child.is_none()
-    ensures
-        self.wf(),
-        self.spec@.value().dom() == old(self).spec@.value().dom().remove(key)
+        requires
+            old(self).wf(),
+            old(self).contains_key(key),
+            old(self).spec@.value()[key].child.is_none(),
+        ensures
+            self.wf(),
+            self.spec@.value().dom() == old(self).spec@.value().dom().remove(key),
+            view(self.spec@.value()) == revoke_single_parent_update(old(self).spec@.value(), key).remove(
+                key,
+            ),
     {
         let tracked _ = self.instance.borrow().clean_links(self.spec.borrow(), self.state.borrow());
         let tracked token = self.instance.borrow_mut().revoke_single(
-            key, self.spec.borrow(), self.tokens.borrow(), self.state.borrow_mut());
+            key,
+            self.spec.borrow(),
+            self.tokens.borrow(),
+            self.state.borrow_mut(),
+        );
 
         let ptr = *self.map.get(&key).unwrap();
         let node = ptr.take(Tracked(&mut token));
 
         if node.back == 0 {
             proof!{ self.lemma_back_null_imp_none(&node); }
-        }
-        else {
+        } else {
             let tracked tok = self.instance.borrow_mut().revoke_take_back(
-                self.spec.borrow(), self.tokens.borrow(), self.state.borrow_mut());
+                self.spec.borrow(),
+                self.tokens.borrow(),
+                self.state.borrow_mut(),
+            );
 
             let back_ptr = PPtr::from_addr(node.back);
             let mut back_node: Node = back_ptr.take(Tracked(&mut tok));
@@ -210,15 +224,22 @@ impl Meta {
 
             back_ptr.put(Tracked(&mut tok), back_node);
             let tracked _ = self.instance.borrow_mut().revoke_put_back(
-                tok, self.spec.borrow_mut(), self.tokens.borrow_mut(), self.state.borrow_mut(), tok);
+                tok,
+                self.spec.borrow_mut(),
+                self.tokens.borrow_mut(),
+                self.state.borrow_mut(),
+                tok,
+            );
         }
 
         if node.next == 0 {
             proof!{ self.lemma_next_null_imp_none(&node); }
-        }
-        else {
+        } else {
             let tracked tok = self.instance.borrow_mut().revoke_take_next(
-                self.spec.borrow(), self.tokens.borrow(), self.state.borrow_mut());
+                self.spec.borrow(),
+                self.tokens.borrow(),
+                self.state.borrow_mut(),
+            );
 
             let next_ptr = PPtr::<Node>::from_addr(node.next);
             let mut next_node = next_ptr.take(Tracked(&mut tok));
@@ -228,7 +249,12 @@ impl Meta {
 
             next_ptr.put(Tracked(&mut tok), next_node);
             let tracked _ = self.instance.borrow_mut().revoke_put_next(
-                tok, self.spec.borrow_mut(), self.tokens.borrow_mut(), self.state.borrow_mut(), tok);
+                tok,
+                self.spec.borrow_mut(),
+                self.tokens.borrow_mut(),
+                self.state.borrow_mut(),
+                tok,
+            );
         }
 
         self.map.remove(&key);
@@ -237,7 +263,11 @@ impl Meta {
         assert(self.spec@.value().dom() == old(self).spec@.value().dom());
 
         let tracked _ = self.instance.borrow_mut().finish_revoke_single(
-            key, self.spec.borrow_mut(), self.tokens.borrow_mut(), self.state.borrow_mut());
+            key,
+            self.spec.borrow_mut(),
+            self.tokens.borrow_mut(),
+            self.state.borrow_mut(),
+        );
 
         let tracked _ = lemma_revoke_link_view(old(self).spec@.value(), self.spec@.value(), key);
 
@@ -245,17 +275,34 @@ impl Meta {
     }
 
     fn revoke_children(&mut self, key: CapKey)
-    requires
-        old(self).wf(),
-        old(self).contains_key(key)
-    ensures
-        self.wf(),
-        self.contains_key(key),
-        self.spec@.value()[key].child.is_none()
-    {
-        loop invariant
+        requires
+            old(self).wf(),
+            old(self).contains_key(key),
+        ensures
             self.wf(),
-            self.contains_key(key)
+            self.contains_key(key),
+            self.spec@.value()[key].child.is_none(),
+    {
+        let ghost revoked_keys = Set::<CapKey>::empty();
+        let ghost inv = {
+            &&& self.spec@.value().dom().disjoint(revoked_keys)
+            &&& old(self).spec@.value().dom() == self.spec@.value().dom().union(revoked_keys)
+            &&& forall|revoked: CapKey|
+                revoked_keys.contains(revoked) ==> #[trigger] transitive_child_of(
+                    old(self).spec@.value(),
+                    revoked,
+                    key,
+                )
+        };
+
+        assert(self.spec@.value().dom().disjoint(revoked_keys));
+        assert(old(self).spec@.value().dom() == self.spec@.value().dom().union(revoked_keys));
+
+        loop
+            invariant
+                self.wf(),
+                self.contains_key(key),
+                inv,
         {
             let child = self.first_child(key);
             let tracked _ = self.lemma_child_null_imp_none(child);
@@ -263,17 +310,17 @@ impl Meta {
             if child.key == key {
                 return
             }
-
             self.revoke_single(child.key);
+            proof! { revoked_keys = revoked_keys.insert(child.key); };
         }
     }
 
     fn borrow_node(&self, key: CapKey) -> (res: &Node)
-    requires
-        self.wf(),
-        self.contains_key(key)
-    ensures
-        self.get(key) == res,
+        requires
+            self.wf(),
+            self.contains_key(key),
+        ensures
+            self.get(key) == res,
     {
         let ptr = self.map.get(&key).unwrap();
         let tracked borrow = self.instance.borrow().borrow_token(
@@ -300,13 +347,13 @@ impl Meta {
     }
 
     fn first_child(&self, parent: CapKey) -> (res: &Node)
-    requires
-        self.wf(),
-        self.contains_key(parent),
-    ensures
-        res.child == 0,
-        self.contains(res),
-        transitive_child_of(self.spec@.value(), res.key, parent)
+        requires
+            self.wf(),
+            self.contains_key(parent),
+        ensures
+            res.child == 0,
+            self.contains(res),
+            transitive_child_of(self.spec@.value(), res.key, parent),
     {
         let mut res = self.borrow_node(parent);
         let mut ptr = *self.map.get(&parent).unwrap();
@@ -315,13 +362,13 @@ impl Meta {
         assert(transitive_child_of(self.spec@.value(), current, parent));
 
         while res.child != 0
-        invariant
-            self.contains_key(current),
-            self.contains_key(parent),
-            self.get(current) == *res,
-            self.tokens@.value()[current].addr() == ptr.addr(),
-            self.wf(),
-            transitive_child_of(self.spec@.value(), current, parent)
+            invariant
+                self.contains_key(current),
+                self.contains_key(parent),
+                self.get(current) == *res,
+                self.tokens@.value()[current].addr() == ptr.addr(),
+                self.wf(),
+                transitive_child_of(self.spec@.value(), current, parent),
         {
             proof! {
                 self.instance.borrow().contains_child(current, self.spec.borrow());
@@ -352,54 +399,78 @@ impl Meta {
     }
 
     proof fn lemma_next_null_imp_none(tracked &self, node: &Node)
-    requires
-        node.next == 0,
-        self.contains(node),
-        self.ties()
-    ensures
-        self.spec@.value()[node.key].next.is_none()
+        requires
+            node.next == 0,
+            self.contains(node),
+            self.ties(),
+        ensures
+            self.spec@.value()[node.key].next.is_none(),
     {
         let next_key = self.spec@.value()[node.key].next;
         if next_key.is_some() {
-            self.instance.borrow().token_invariant(node.key, self.spec.borrow(), self.tokens.borrow());
+            self.instance.borrow().token_invariant(
+                node.key,
+                self.spec.borrow(),
+                self.tokens.borrow(),
+            );
             self.instance.borrow().contains_next(node.key, self.spec.borrow());
-            self.instance.borrow().addr_nonnull(next_key.unwrap(), self.spec.borrow(), self.tokens.borrow());
+            self.instance.borrow().addr_nonnull(
+                next_key.unwrap(),
+                self.spec.borrow(),
+                self.tokens.borrow(),
+            );
             assert(node.child != 0);
         }
     }
 
     proof fn lemma_child_null_imp_none(tracked &self, node: &Node)
-    requires
-        node.child == 0,
-        self.contains(node),
-        self.ties()
-    ensures
-        self.spec@.value()[node.key].child.is_none()
+        requires
+            node.child == 0,
+            self.contains(node),
+            self.ties(),
+        ensures
+            self.spec@.value()[node.key].child.is_none(),
     {
         // prove that key.child == None in this case
         let child_key = self.spec@.value()[node.key].child;
         if child_key.is_some() {
-            self.instance.borrow().token_invariant(node.key, self.spec.borrow(), self.tokens.borrow());
+            self.instance.borrow().token_invariant(
+                node.key,
+                self.spec.borrow(),
+                self.tokens.borrow(),
+            );
             self.instance.borrow().contains_child(node.key, self.spec.borrow());
-            self.instance.borrow().addr_nonnull(child_key.unwrap(), self.spec.borrow(), self.tokens.borrow());
+            self.instance.borrow().addr_nonnull(
+                child_key.unwrap(),
+                self.spec.borrow(),
+                self.tokens.borrow(),
+            );
             assert(node.child != 0);
         }
     }
 
     proof fn lemma_back_null_imp_none(tracked &self, node: &Node)
-    requires
-        node.back == 0,
-        self.contains(node),
-        self.ties()
-    ensures
-        self.spec@.value()[node.key].back.is_none()
+        requires
+            node.back == 0,
+            self.contains(node),
+            self.ties(),
+        ensures
+            self.spec@.value()[node.key].back.is_none(),
     {
         // prove that key.back == None in this case
         let back_key = self.spec@.value()[node.key].back;
         if back_key.is_some() {
-            self.instance.borrow().token_invariant(node.key, self.spec.borrow(), self.tokens.borrow());
+            self.instance.borrow().token_invariant(
+                node.key,
+                self.spec.borrow(),
+                self.tokens.borrow(),
+            );
             self.instance.borrow().contains_back(node.key, self.spec.borrow());
-            self.instance.borrow().addr_nonnull(back_key.unwrap(), self.spec.borrow(), self.tokens.borrow());
+            self.instance.borrow().addr_nonnull(
+                back_key.unwrap(),
+                self.spec.borrow(),
+                self.tokens.borrow(),
+            );
             assert(node.back != 0);
         }
     }

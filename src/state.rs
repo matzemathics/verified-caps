@@ -1,20 +1,9 @@
 use state_machines_macros::tokenized_state_machine;
 use vstd::prelude::*;
 
+use crate::tcb::{next_index, weak_next_connected, CapKey, LinkMap, LinkedNode};
+
 verus! {
-
-pub type CapKey = u64;
-
-pub ghost struct LinkedNode {
-    pub back: Option<CapKey>,
-    pub next: Option<CapKey>,
-    pub child: Option<CapKey>,
-    pub first_child: bool,
-    pub depth: nat,
-    pub index: nat,
-}
-
-pub type LinkMap = Map<CapKey, LinkedNode>;
 
 pub ghost enum LinkState {
     Null,
@@ -99,19 +88,17 @@ impl SysState {
     }
 }
 
-pub open spec fn back_link_condition(
-    state: SysState,
-    map: LinkMap,
-    key: CapKey,
-) -> bool {
+pub open spec fn back_link_condition(state: SysState, map: LinkMap, key: CapKey) -> bool {
     if map[key].back.is_none() {
         true
     } else {
-        let back = map[key].back.unwrap(); {
+        let back = map[key].back.unwrap();
+        {
             &&& back != key
             &&& map.contains_key(back)
             &&& map[key].first_child ==> map[key].depth == map[back].depth + 1
-            &&& map[key].first_child || (map[key].depth == map[back].depth && map[key].index < map[back].index)
+            &&& map[key].first_child || (map[key].depth == map[back].depth && map[key].index
+                < map[back].index)
             &&& (state.allow_broken_back_link(key, back) || {
                 match map[key].first_child {
                     true => map[back].child == Some(key),
@@ -122,15 +109,12 @@ pub open spec fn back_link_condition(
     }
 }
 
-pub open spec fn next_link_condition(
-    state: SysState,
-    map: LinkMap,
-    key: CapKey,
-) -> bool {
+pub open spec fn next_link_condition(state: SysState, map: LinkMap, key: CapKey) -> bool {
     if map[key].next.is_none() {
         true
     } else {
-        let next = map[key].next.unwrap(); {
+        let next = map[key].next.unwrap();
+        {
             &&& next != key
             &&& map.contains_key(next)
             &&& map[key].depth == map[next].depth && map[key].index > map[next].index
@@ -141,31 +125,12 @@ pub open spec fn next_link_condition(
     }
 }
 
-pub open spec fn weak_next_link_condition(
-    map: LinkMap,
-    key: CapKey,
-) -> bool {
-    if map[key].next.is_none() {
-        true
-    } else {
-        let next = map[key].next.unwrap(); {
-            &&& next != key
-            &&& map.contains_key(next)
-            &&& map[key].depth == map[next].depth
-            &&& map[key].index > map[next].index
-        }
-    }
-}
-
-pub open spec fn child_link_condition(
-    state: SysState,
-    map: LinkMap,
-    key: CapKey,
-) -> bool {
+pub open spec fn child_link_condition(state: SysState, map: LinkMap, key: CapKey) -> bool {
     if map[key].child.is_none() {
         true
     } else {
-        let child = map[key].child.unwrap(); {
+        let child = map[key].child.unwrap();
+        {
             &&& child != key
             &&& map.contains_key(child)
             &&& map[key].depth + 1 == map[child].depth
@@ -176,14 +141,12 @@ pub open spec fn child_link_condition(
     }
 }
 
-pub open spec fn weak_child_link_condition(
-    map: LinkMap,
-    key: CapKey,
-) -> bool {
+pub open spec fn weak_child_link_condition(map: LinkMap, key: CapKey) -> bool {
     if map[key].child.is_none() {
         true
     } else {
-        let child = map[key].child.unwrap(); {
+        let child = map[key].child.unwrap();
+        {
             &&& child != key
             &&& map.contains_key(child)
             &&& map[key].depth + 1 == map[child].depth
@@ -191,21 +154,8 @@ pub open spec fn weak_child_link_condition(
     }
 }
 
-pub open spec fn next_index(map: LinkMap, key: Option<CapKey>) -> nat {
-    if key.is_some() {
-        map[key.unwrap()].index + 1
-    }
-    else {
-        0
-    }
-}
-
-pub open spec fn weak_next_connected(map: LinkMap) -> bool {
-    forall |key: CapKey| map.contains_key(key) ==> #[trigger] weak_next_link_condition(map, key)
-}
-
 pub open spec fn weak_child_connected(map: LinkMap) -> bool {
-    forall |key: CapKey| map.contains_key(key) ==> #[trigger] weak_child_link_condition(map, key)
+    forall|key: CapKey| map.contains_key(key) ==> #[trigger] weak_child_link_condition(map, key)
 }
 
 pub trait Token: Sized {
@@ -219,7 +169,11 @@ pub trait Token: Sized {
     spec fn cond(&self, next: usize, child: usize, back: usize, first_child: bool) -> bool;
 }
 
-pub open spec fn token_invariant<T: Token>(map: LinkMap, tokens: Map<CapKey, T>, key: CapKey) -> bool {
+pub open spec fn token_invariant<T: Token>(
+    map: LinkMap,
+    tokens: Map<CapKey, T>,
+    key: CapKey,
+) -> bool {
     let next = if map[key].next.is_none() {
         0
     } else {
@@ -256,13 +210,15 @@ pub open spec fn revoke_next_fixed(map: LinkMap, key: CapKey) -> bool {
 }
 
 pub open spec fn clean_links(map: LinkMap) -> bool {
-    forall |key: CapKey|
-    #![trigger map[key].child] #![trigger map[key].next] #![trigger map[key].back]
-    map.contains_key(key) ==> {
-        &&& next_link_condition(SysState::Clean, map, key)
-        &&& back_link_condition(SysState::Clean, map, key)
-        &&& child_link_condition(SysState::Clean, map, key)
-    }
+    forall|key: CapKey|
+        #![trigger map[key].child]
+        #![trigger map[key].next]
+        #![trigger map[key].back]
+        map.contains_key(key) ==> {
+            &&& next_link_condition(SysState::Clean, map, key)
+            &&& back_link_condition(SysState::Clean, map, key)
+            &&& child_link_condition(SysState::Clean, map, key)
+        }
 }
 
 tokenized_state_machine!(LinkSystem<T: Token>{
