@@ -80,9 +80,8 @@ pub proof fn lemma_siblings_jump(pre: LinkMap, post: LinkMap, start: CapKey, jum
             assert(weak_next_link_condition(pre, jump));
             assert(weak_next_link_condition(pre, pre[jump].next.unwrap()));
 
-            assert forall|after: CapKey| #[trigger]
-                siblings(pre, Some(next)).contains(after) implies post[after].next
-                == pre[after].next by {
+            assert forall|after: CapKey| #[trigger] siblings(pre, Some(next)).contains(after)
+            implies post[after].next == pre[after].next by {
                 lemma_siblings_contained(pre, Some(next), after);
                 lemma_siblings_decreasing(pre, removed, after);
             };
@@ -173,32 +172,26 @@ pub proof fn lemma_revoke_link_view(pre: LinkMap, post: LinkMap, removed: CapKey
     ensures
         view(post) == revoke_single_parent_update(pre, removed).remove(removed),
 {
-    assert forall|key: CapKey|
-        post.contains_key(key) && pre[removed].back != Some(key) implies #[trigger] pre[key].next
-        == post[key].next by {
-        if Some(key) == pre[removed].next {
-        } else if Some(key) == pre[removed].child {
-        } else {
-        }
+    assert forall|key: CapKey| post.contains_key(key) && pre[removed].back != Some(key)
+    implies #[trigger] pre[key].next == post[key].next by {
+        if Some(key) == pre[removed].next { }
+        else if Some(key) == pre[removed].child { }
+        else { }
     };
 
-    assert forall|key: CapKey|
-        pre.contains_key(key) && !sibling_of(pre, removed, key) implies #[trigger] pre[key].next
-        == post[key].next by {
+    assert forall|key: CapKey| pre.contains_key(key) && !sibling_of(pre, removed, key)
+    implies #[trigger] pre[key].next == post[key].next by {
         if Some(key) == pre[removed].back {
-            if pre[removed].first_child {
-            } else {
+            if pre[removed].first_child { }
+            else {
                 assert(back_link_condition(SysState::Clean, pre, removed));
                 lemma_sibling_of_next(pre, key);
             }
-        } else {
-        }
+        } else { }
     };
 
-    assert forall|parent: CapKey|
-        post.contains_key(parent) && !child_of(pre, removed, parent) implies #[trigger] view(
-        post,
-    )[parent] == view(pre)[parent] by {
+    assert forall|parent: CapKey| post.contains_key(parent) && !child_of(pre, removed, parent)
+    implies #[trigger] view(post)[parent] == view(pre)[parent] by {
         assert(pre[parent].depth == post[parent].depth);
         assert(get_parent(pre, removed) != Some(parent));
 
@@ -243,9 +236,8 @@ pub proof fn lemma_revoke_link_view(pre: LinkMap, post: LinkMap, removed: CapKey
             assert(view(pre)[parent].children.remove_value(removed) == critical);
             assert(view(post)[parent].children == siblings(post, post[parent].child));
 
-            assert forall|sib: CapKey| #[trigger]
-                siblings(pre, pre[removed].next).contains(sib) implies post[sib].next
-                == pre[sib].next by {
+            assert forall|sib: CapKey| #[trigger] siblings(pre, pre[removed].next).contains(sib)
+            implies post[sib].next == pre[sib].next by {
                 lemma_siblings_contained(pre, pre[removed].next, sib);
 
                 if sib == parent {
@@ -282,8 +274,8 @@ pub proof fn lemma_revoke_link_view(pre: LinkMap, post: LinkMap, removed: CapKey
             }
         }
     }
-    assert forall|key: CapKey| #[trigger] post.contains_key(key) implies view(post)[key]
-        == revoke_single_parent_update(pre, removed).remove(removed)[key] by {
+    assert forall|key: CapKey| #[trigger] post.contains_key(key)
+    implies view(post)[key] == revoke_single_parent_update(pre, removed).remove(removed)[key] by {
         if Some(key) == get_parent(pre, removed) {
         } else {
             assert(!child_of(pre, removed, key)) by {
@@ -302,22 +294,30 @@ pub proof fn lemma_revoke_link_view(pre: LinkMap, post: LinkMap, removed: CapKey
 }
 
 pub proof fn lemma_revoke_transitive_changes(pre: LinkMap, removed: CapKey, parent: CapKey)
-requires
-    transitive_child_of(view(pre), removed, parent)
-ensures
-    transitive_children(view(pre), parent) ==
-    transitive_children(revoke_single_parent_update(pre, removed).remove(removed), parent).insert(removed)
+    requires
+        transitive_child_of(view(pre), removed, parent),
+    ensures
+        transitive_children(view(pre), parent) == transitive_children(
+            revoke_single_parent_update(pre, removed).remove(removed),
+            parent,
+        ).insert(removed),
 {
     admit()
 }
 
-pub proof fn lemma_revoke_transitive_non_changes(pre: LinkMap, removed: CapKey, parent: CapKey, subtree: Set<CapKey>)
-requires
-    transitive_child_of(view(pre), removed, parent),
-    transitive_children(view(pre), parent).subset_of(subtree)
-ensures
-    view(pre).remove_keys(subtree) ==
-    revoke_single_parent_update(pre, removed).remove(removed).remove_keys(subtree)
+pub proof fn lemma_revoke_transitive_non_changes(
+    pre: LinkMap,
+    removed: CapKey,
+    parent: CapKey,
+    subtree: Set<CapKey>,
+)
+    requires
+        transitive_child_of(view(pre), removed, parent),
+        transitive_children(view(pre), parent).subset_of(subtree),
+    ensures
+        view(pre).remove_keys(subtree) == revoke_single_parent_update(pre, removed).remove(
+            removed,
+        ).remove_keys(subtree),
 {
     admit()
 }

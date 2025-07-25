@@ -143,7 +143,6 @@ pub open spec fn child_link_condition(state: SysState, map: LinkMap, key: CapKey
     }
 }
 
-
 pub trait Token: Sized {
     spec fn addr(&self) -> usize;
 

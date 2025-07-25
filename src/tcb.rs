@@ -108,12 +108,15 @@ pub open spec fn connection_condition(map: CapMap, child: CapKey, parent: CapKey
 }
 
 pub open spec fn map_connected(map: CapMap) -> bool {
-    forall |parent: CapKey, child: CapKey| #[trigger] connection_condition(map, child, parent)
+    forall|parent: CapKey, child: CapKey| #[trigger] connection_condition(map, child, parent)
 }
 
 #[via_fn]
 proof fn transitive_child_of_decreases(map: CapMap, child: CapKey, parent: CapKey) {
-    admit()
+    assert forall|node: CapKey| map.contains_key(node) && map[node].children.contains(child)
+    implies map[node].generation < map[child].generation by {
+        assert(connection_condition(map, child, node));
+    }
 }
 
 pub open spec fn transitive_child_of(map: CapMap, child: CapKey, parent: CapKey) -> bool
@@ -124,11 +127,12 @@ pub open spec fn transitive_child_of(map: CapMap, child: CapKey, parent: CapKey)
     if child == parent {
         true
     } else {
-        exists |node: CapKey| {
-            &&& map.contains_key(node)
-            &&& #[trigger] map[node].children.contains(child)
-            &&& transitive_child_of(map, node, parent)
-        }
+        exists|node: CapKey|
+            {
+                &&& map.contains_key(node)
+                &&& #[trigger] map[node].children.contains(child)
+                &&& transitive_child_of(map, node, parent)
+            }
     }
 }
 

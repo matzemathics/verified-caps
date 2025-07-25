@@ -203,10 +203,7 @@ impl Meta {
         ensures
             self.wf(),
             self.spec().dom() == old(self).spec().dom().remove(key),
-            view(self.spec()) == revoke_single_parent_update(
-                old(self).spec(),
-                key,
-            ).remove(key),
+            view(self.spec()) == revoke_single_parent_update(old(self).spec(), key).remove(key),
     {
         let tracked _ = self.instance.borrow().clean_links(self.spec.borrow(), self.state.borrow());
         let tracked token = self.instance.borrow_mut().revoke_single(
@@ -316,17 +313,25 @@ impl Meta {
                 self.dom().disjoint(revoked_keys),
                 old(self).dom() == self.dom().union(revoked_keys),
                 subtree == transitive_children(view(self.spec()), key).union(revoked_keys),
-                view(old(self).spec()).remove_keys(subtree) == view(self.spec()).remove_keys(subtree),
+                view(old(self).spec()).remove_keys(subtree) == view(self.spec()).remove_keys(
+                    subtree,
+                ),
             ensures
-                self.spec()[key].child.is_none()
+                self.spec()[key].child.is_none(),
         {
             let child = self.first_child(key);
             let tracked _ = self.lemma_child_null_imp_none(child);
 
-            if child.key == key { break }
-
+            if child.key == key {
+                break
+            }
             let tracked _ = lemma_revoke_transitive_changes(self.spec(), child.key, key);
-            let tracked _ = lemma_revoke_transitive_non_changes(self.spec(), child.key, key, subtree);
+            let tracked _ = lemma_revoke_transitive_non_changes(
+                self.spec(),
+                child.key,
+                key,
+                subtree,
+            );
             self.revoke_single(child.key);
 
             proof! {
@@ -347,12 +352,15 @@ impl Meta {
         let tracked _ = self.instance.borrow().weak_connections(self.spec.borrow());
         let tracked _ = lemma_view_well_formed(self.spec());
 
-        assert forall |child: CapKey| transitive_child_of(view(self.spec()), child, key)
-        implies child == key
-        by { lemma_transitive_children_empty(view(self.spec()), key, child) };
+        assert forall|child: CapKey|
+            transitive_child_of(view(self.spec()), child, key) implies child == key by {
+            lemma_transitive_children_empty(view(self.spec()), key, child)
+        };
 
         assert(revoked_keys.insert(key) == subtree);
-        assert(view(self.spec()).remove_keys(subtree) == view(old(self).spec()).remove_keys(subtree));
+        assert(view(self.spec()).remove_keys(subtree) == view(old(self).spec()).remove_keys(
+            subtree,
+        ));
         let tracked _ = lemma_siblings_none_empty(self.spec());
         assert(view(self.spec())[key].children.len() == 0);
         assert(self.dom() == old(self).dom().difference(revoked_keys));

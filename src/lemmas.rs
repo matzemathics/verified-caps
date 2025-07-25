@@ -492,14 +492,13 @@ pub proof fn lemma_sib_back_some(map: LinkMap, start: CapKey, child: CapKey)
 }
 
 pub proof fn lemma_view_well_formed(map: LinkMap)
-requires
-    weak_next_connected(map),
-    weak_child_connected(map)
-ensures
-    map_connected(view(map))
+    requires
+        weak_next_connected(map),
+        weak_child_connected(map),
+    ensures
+        map_connected(view(map)),
 {
-    assert forall |parent: CapKey, child: CapKey| connection_condition(view(map), child, parent)
-    by {
+    assert forall|parent: CapKey, child: CapKey| connection_condition(view(map), child, parent) by {
         if view(map).contains_key(parent) && view(map)[parent].children.contains(child) {
             assert(child_of(map, child, parent));
             assert(weak_child_link_condition(map, parent));
@@ -510,21 +509,22 @@ ensures
 }
 
 pub proof fn lemma_transitive_children_empty(map: CapMap, parent: CapKey, child: CapKey)
-requires
-    map.contains_key(parent),
-    map_connected(map),
-    transitive_child_of(map, child, parent),
-    map[parent].children.len() == 0,
-ensures
-    child == parent
-decreases map[child].generation
+    requires
+        map.contains_key(parent),
+        map_connected(map),
+        transitive_child_of(map, child, parent),
+        map[parent].children.len() == 0,
+    ensures
+        child == parent,
+    decreases map[child].generation,
 {
     if child != parent {
-        let intermediate = choose |key: CapKey| {
-            &&& map.contains_key(key)
-            &&& #[trigger] map[key].children.contains(child)
-            &&& transitive_child_of(map, key, parent)
-        };
+        let intermediate = choose|key: CapKey|
+            {
+                &&& map.contains_key(key)
+                &&& #[trigger] map[key].children.contains(child)
+                &&& transitive_child_of(map, key, parent)
+            };
 
         assert(connection_condition(map, child, intermediate));
         lemma_transitive_children_empty(map, parent, intermediate);
