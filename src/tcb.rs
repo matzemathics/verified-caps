@@ -1,5 +1,7 @@
 use vstd::prelude::*;
 
+use crate::lemmas::lemma_child_of_depth;
+
 verus! {
 
 pub type CapKey = u64;
@@ -23,7 +25,6 @@ pub ghost struct CapNode {
     pub generation: nat,
     pub children: Seq<CapKey>,
 }
-
 
 pub open spec fn view(map: LinkMap) -> CapMap {
     map.map_values(|node: LinkedNode| node.to_spec(map))
@@ -97,6 +98,59 @@ pub open spec fn child_of(map: LinkMap, child: CapKey, parent: CapKey) -> bool {
 
 pub open spec fn sibling_of(map: LinkMap, a: CapKey, b: CapKey) -> bool {
     get_parent(map, a) == get_parent(map, b)
+}
+
+pub open spec fn connection_condition(map: CapMap, child: CapKey, parent: CapKey) -> bool {
+    map.contains_key(parent) && map[parent].children.contains(child) ==> {
+        &&& map.contains_key(child)
+        &&& map[child].generation == map[parent].generation + 1
+    }
+}
+
+pub open spec fn map_connected(map: CapMap) -> bool {
+    forall |parent: CapKey, child: CapKey| #[trigger] connection_condition(map, child, parent)
+}
+
+#[via_fn]
+proof fn transitive_child_of_decreases(map: CapMap, child: CapKey, parent: CapKey) {
+    admit()
+}
+
+pub open spec fn transitive_child_of(map: CapMap, child: CapKey, parent: CapKey) -> bool
+    decreases map[child].generation,
+    when map_connected(map)
+    via transitive_child_of_decreases
+{
+    if child == parent {
+        true
+    } else {
+        exists |node: CapKey| {
+            &&& map.contains_key(node)
+            &&& #[trigger] map[node].children.contains(child)
+            &&& transitive_child_of(map, node, parent)
+        }
+    }
+}
+
+pub open spec fn transitive_children(map: CapMap, parent: CapKey) -> Set<CapKey> {
+    map.dom().filter(|node| transitive_child_of(map, node, parent))
+}
+
+pub open spec fn weak_child_link_condition(map: LinkMap, key: CapKey) -> bool {
+    if map[key].child.is_none() {
+        true
+    } else {
+        let child = map[key].child.unwrap();
+        {
+            &&& child != key
+            &&& map.contains_key(child)
+            &&& map[key].depth + 1 == map[child].depth
+        }
+    }
+}
+
+pub open spec fn weak_child_connected(map: LinkMap) -> bool {
+    forall|key: CapKey| map.contains_key(key) ==> #[trigger] weak_child_link_condition(map, key)
 }
 
 pub open spec fn insert_child(map: CapMap, parent: CapKey, child: CapKey) -> CapMap {

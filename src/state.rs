@@ -1,7 +1,9 @@
 use state_machines_macros::tokenized_state_machine;
 use vstd::prelude::*;
 
-use crate::tcb::{next_index, weak_next_connected, CapKey, LinkMap, LinkedNode};
+use crate::tcb::{
+    next_index, weak_child_connected, weak_next_connected, CapKey, LinkMap, LinkedNode,
+};
 
 verus! {
 
@@ -141,22 +143,6 @@ pub open spec fn child_link_condition(state: SysState, map: LinkMap, key: CapKey
     }
 }
 
-pub open spec fn weak_child_link_condition(map: LinkMap, key: CapKey) -> bool {
-    if map[key].child.is_none() {
-        true
-    } else {
-        let child = map[key].child.unwrap();
-        {
-            &&& child != key
-            &&& map.contains_key(child)
-            &&& map[key].depth + 1 == map[child].depth
-        }
-    }
-}
-
-pub open spec fn weak_child_connected(map: LinkMap) -> bool {
-    forall|key: CapKey| map.contains_key(key) ==> #[trigger] weak_child_link_condition(map, key)
-}
 
 pub trait Token: Sized {
     spec fn addr(&self) -> usize;

@@ -9,8 +9,9 @@ use crate::{
     },
     state::{back_link_condition, clean_links, SysState},
     tcb::{
-        child_of, get_parent, revoke_single_parent_update, sibling_of, siblings, view,
-        weak_next_connected, weak_next_link_condition, CapKey, LinkMap,
+        child_of, get_parent, revoke_single_parent_update, sibling_of, siblings,
+        transitive_child_of, transitive_children, view, weak_next_connected,
+        weak_next_link_condition, CapKey, LinkMap,
     },
 };
 
@@ -298,6 +299,27 @@ pub proof fn lemma_revoke_link_view(pre: LinkMap, post: LinkMap, removed: CapKey
     };
 
     assert(view(post) =~= revoke_single_parent_update(pre, removed).remove(removed));
+}
+
+pub proof fn lemma_revoke_transitive_changes(pre: LinkMap, removed: CapKey, parent: CapKey)
+requires
+    transitive_child_of(view(pre), removed, parent)
+ensures
+    transitive_children(view(pre), parent) ==
+    transitive_children(revoke_single_parent_update(pre, removed).remove(removed), parent).insert(removed)
+{
+    admit()
+}
+
+pub proof fn lemma_revoke_transitive_non_changes(pre: LinkMap, removed: CapKey, parent: CapKey, subtree: Set<CapKey>)
+requires
+    transitive_child_of(view(pre), removed, parent),
+    transitive_children(view(pre), parent).subset_of(subtree)
+ensures
+    view(pre).remove_keys(subtree) ==
+    revoke_single_parent_update(pre, removed).remove(removed).remove_keys(subtree)
+{
+    admit()
 }
 
 } // verus!

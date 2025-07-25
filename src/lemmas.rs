@@ -2,12 +2,12 @@ use vstd::prelude::*;
 
 use crate::{
     state::{
-        back_link_condition, child_link_condition, clean_links, next_link_condition,
-        weak_child_connected, weak_child_link_condition, SysState,
+        back_link_condition, child_link_condition, clean_links, next_link_condition, SysState,
     },
     tcb::{
-        child_of, get_parent, sibling_of, siblings, weak_next_connected, weak_next_link_condition,
-        CapKey, LinkMap,
+        child_of, connection_condition, get_parent, map_connected, sibling_of, siblings,
+        transitive_child_of, view, weak_child_connected, weak_child_link_condition,
+        weak_next_connected, weak_next_link_condition, CapKey, CapMap, LinkMap,
     },
 };
 
@@ -341,35 +341,6 @@ pub proof fn lemma_child_of_depth(map: LinkMap, child: CapKey, parent: CapKey)
     }
 }
 
-#[via_fn]
-proof fn transitive_child_of_decreases(map: LinkMap, child: CapKey, parent: CapKey) {
-    assert forall|node: CapKey| #[trigger] child_of(map, child, node) implies map[child].depth
-        > map[node].depth by {
-        lemma_child_of_depth(map, child, node);
-    }
-}
-
-pub open spec fn transitive_child_of(map: LinkMap, child: CapKey, parent: CapKey) -> bool
-    decreases map[child].depth,
-    when weak_child_connected(map) && weak_next_connected(map) && map.contains_key(parent)
-    via transitive_child_of_decreases
-{
-    if child == parent {
-        true
-    } else {
-        exists|node: CapKey| child_of(map, child, node) && transitive_child_of(map, node, parent)
-    }
-}
-
-pub open spec fn transitive_children(map: LinkMap, parent: CapKey) -> Set<CapKey> {
-    map.dom().filter(|node| transitive_child_of(map, node, parent))
-}
-
-// pub proof fn lemma_transitive_children_removed(pre: LinkMap, post: LinkMap, parent: CapKey, removed: Set<CapKey>)
-// requires
-//     post.dom().disjoint(removed),
-//     pre.dom() == post.dom().union(removed)
-// {}
 pub proof fn lemma_child_of_univalent(
     map: LinkMap,
     parent_a: CapKey,
@@ -517,6 +488,46 @@ pub proof fn lemma_sib_back_some(map: LinkMap, start: CapKey, child: CapKey)
         }
     } else {
         lemma_siblings_none_empty(map);
+    }
+}
+
+pub proof fn lemma_view_well_formed(map: LinkMap)
+requires
+    weak_next_connected(map),
+    weak_child_connected(map)
+ensures
+    map_connected(view(map))
+{
+    assert forall |parent: CapKey, child: CapKey| connection_condition(view(map), child, parent)
+    by {
+        if view(map).contains_key(parent) && view(map)[parent].children.contains(child) {
+            assert(child_of(map, child, parent));
+            assert(weak_child_link_condition(map, parent));
+            lemma_child_of_depth(map, child, parent);
+            lemma_siblings_contained(map, map[parent].child, child);
+        }
+    }
+}
+
+pub proof fn lemma_transitive_children_empty(map: CapMap, parent: CapKey, child: CapKey)
+requires
+    map.contains_key(parent),
+    map_connected(map),
+    transitive_child_of(map, child, parent),
+    map[parent].children.len() == 0,
+ensures
+    child == parent
+decreases map[child].generation
+{
+    if child != parent {
+        let intermediate = choose |key: CapKey| {
+            &&& map.contains_key(key)
+            &&& #[trigger] map[key].children.contains(child)
+            &&& transitive_child_of(map, key, parent)
+        };
+
+        assert(connection_condition(map, child, intermediate));
+        lemma_transitive_children_empty(map, parent, intermediate);
     }
 }
 
