@@ -1,7 +1,5 @@
 use vstd::prelude::*;
 
-use crate::lemmas::lemma_child_of_depth;
-
 verus! {
 
 pub type CapKey = u64;
@@ -113,7 +111,7 @@ pub open spec fn map_connected(map: CapMap) -> bool {
 
 #[via_fn]
 proof fn transitive_child_of_decreases(map: CapMap, child: CapKey, parent: CapKey) {
-    assert forall|node: CapKey| map.contains_key(node) && map[node].children.contains(child)
+    assert forall|node: CapKey| #[trigger] map.contains_key(node) && map[node].children.contains(child)
     implies map[node].generation < map[child].generation by {
         assert(connection_condition(map, child, node));
     }

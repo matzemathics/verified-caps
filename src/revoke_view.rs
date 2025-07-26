@@ -9,7 +9,7 @@ use crate::{
     },
     state::{back_link_condition, clean_links, SysState},
     tcb::{
-        child_of, get_parent, revoke_single_parent_update, sibling_of, siblings,
+        child_of, get_parent, map_connected, revoke_single_parent_update, sibling_of, siblings,
         transitive_child_of, transitive_children, view, weak_next_connected,
         weak_next_link_condition, CapKey, LinkMap,
     },
@@ -295,13 +295,23 @@ pub proof fn lemma_revoke_link_view(pre: LinkMap, post: LinkMap, removed: CapKey
 
 pub proof fn lemma_revoke_transitive_changes(pre: LinkMap, removed: CapKey, parent: CapKey)
     requires
-        transitive_child_of(view(pre), removed, parent),
+        map_connected(view(pre)),
+        map_connected(revoke_single_parent_update(pre, removed).remove(removed)),
     ensures
-        transitive_children(view(pre), parent) == transitive_children(
+        transitive_children(view(pre), parent).remove(removed) == transitive_children(
             revoke_single_parent_update(pre, removed).remove(removed),
             parent,
-        ).insert(removed),
+        ),
 {
+    let post = revoke_single_parent_update(pre, removed).remove(removed);
+    assert(transitive_children(post, parent)
+        .subset_of(transitive_children(view(pre), parent)))
+    by {
+        assert forall |key: CapKey| #[trigger] transitive_child_of(post, key, parent)
+        implies transitive_child_of(view(pre), key, parent)
+        by { admit() };
+    };
+
     admit()
 }
 
@@ -312,6 +322,11 @@ pub proof fn lemma_revoke_transitive_non_changes(
     subtree: Set<CapKey>,
 )
     requires
+        removed != parent,
+        pre.contains_key(removed),
+        clean_links(pre),
+        map_connected(view(pre)),
+        map_connected(revoke_single_parent_update(pre, removed).remove(removed)),
         transitive_child_of(view(pre), removed, parent),
         transitive_children(view(pre), parent).subset_of(subtree),
     ensures
@@ -319,7 +334,26 @@ pub proof fn lemma_revoke_transitive_non_changes(
             removed,
         ).remove_keys(subtree),
 {
-    admit()
+    assert(transitive_children(view(pre), parent).contains(removed));
+    assert(subtree.contains(removed));
+    let post = revoke_single_parent_update(pre, removed).remove(removed);
+
+    let direct_parent = choose |node: CapKey| {
+        &&& view(pre).contains_key(node)
+        &&& #[trigger] view(pre)[node].children.contains(removed)
+        &&& transitive_child_of(view(pre), node, parent)
+    };
+
+    assert(subtree.contains(direct_parent));
+    lemma_child_of_univalent(pre, direct_parent, get_parent(pre, removed).unwrap(), removed);
+
+    assert forall |key: CapKey| post.contains_key(key) && key != direct_parent
+    implies #[trigger] post[key] == view(pre)[key]
+    by {};
+
+    assert(view(pre).remove_keys(subtree) =~= revoke_single_parent_update(pre, removed).remove(
+            removed,
+        ).remove_keys(subtree));
 }
 
 } // verus!

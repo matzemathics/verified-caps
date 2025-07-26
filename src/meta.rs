@@ -1,10 +1,6 @@
-use core::num::ParseIntError;
-
 use vstd::{
     hash_map::HashMapWithView,
     prelude::*,
-    relations::transitive,
-    set::axiom_set_union,
     simple_pptr::{PPtr, PointsTo},
 };
 
@@ -21,7 +17,7 @@ use crate::{
     state::{LinkSystem, SysState, Token},
     tcb::{
         child_of, get_parent, revoke_single_parent_update, siblings, transitive_child_of,
-        transitive_children, view, weak_child_link_condition, CapKey, CapNode, LinkMap,
+        transitive_children, view, weak_child_link_condition, CapKey, LinkMap,
     },
 };
 
@@ -325,14 +321,21 @@ impl Meta {
             if child.key == key {
                 break
             }
-            let tracked _ = lemma_revoke_transitive_changes(self.spec(), child.key, key);
+
+            let tracked _ = self.instance.borrow().weak_connections(self.spec.borrow());
+            let tracked _ = lemma_view_well_formed(self.spec());
+            let tracked _ = self.instance.borrow().clean_links(self.spec.borrow(), self.state.borrow());
+            let ghost pre = self.spec();
+            self.revoke_single(child.key);
+            let tracked _ = self.instance.borrow().weak_connections(self.spec.borrow());
+            let tracked _ = lemma_view_well_formed(self.spec());
+            let tracked _ = lemma_revoke_transitive_changes(pre, child.key, key);
             let tracked _ = lemma_revoke_transitive_non_changes(
-                self.spec(),
+                pre,
                 child.key,
                 key,
                 subtree,
             );
-            self.revoke_single(child.key);
 
             proof! {
                 revoked_keys = revoked_keys.insert(child.key);
