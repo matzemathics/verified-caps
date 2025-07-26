@@ -157,7 +157,7 @@ pub proof fn lemma_siblings_jump(pre: LinkMap, post: LinkMap, start: CapKey, jum
     }
 }
 
-pub proof fn lemma_revoke_link_view(pre: LinkMap, post: LinkMap, removed: CapKey)
+pub proof fn lemma_revoke_spec(pre: LinkMap, post: LinkMap, removed: CapKey)
     requires
         post.dom() == pre.dom().remove(removed),
         clean_links(pre),

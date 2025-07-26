@@ -11,8 +11,7 @@ use crate::{
         lemma_view_well_formed,
     },
     revoke_view::{
-        lemma_revoke_link_view, lemma_revoke_transitive_changes,
-        lemma_revoke_transitive_non_changes,
+        lemma_revoke_spec, lemma_revoke_transitive_changes, lemma_revoke_transitive_non_changes,
     },
     state::{LinkSystem, SysState, Token},
     tcb::{
@@ -276,7 +275,7 @@ impl Meta {
             self.state.borrow_mut(),
         );
 
-        let tracked _ = lemma_revoke_link_view(old(self).spec(), self.spec(), key);
+        let tracked _ = lemma_revoke_spec(old(self).spec(), self.spec(), key);
 
         assert(self.spec().dom() == self.map@.dom());
     }
