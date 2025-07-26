@@ -15,14 +15,14 @@ pub mod boxed {
 
 use vstd::prelude::*;
 
-// mod linear;
+mod insert_view;
+mod lemmas;
 mod meta;
 mod nullable;
 mod ptr_map;
+mod revoke_view;
 mod state;
-#[cfg(disable)]
-mod treap;
-mod view;
+mod tcb;
 
 verus! {
 
