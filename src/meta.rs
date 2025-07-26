@@ -289,6 +289,8 @@ impl Meta {
             self.wf(),
             self.contains_key(key),
             self.spec()[key].child.is_none(),
+            self.dom() == old(self).dom().difference(transitive_children(view(old(self).spec()), key)).insert(key),
+            view(self.spec()).remove(key) == view(old(self).spec()).remove_keys(transitive_children(view(old(self).spec()), key)),
     {
         broadcast use vstd::set::group_set_axioms;
 
@@ -364,9 +366,14 @@ impl Meta {
         assert(view(self.spec()).remove_keys(subtree) == view(old(self).spec()).remove_keys(
             subtree,
         ));
+        assert(view(self.spec()).remove(key) ==
+            view(old(self).spec()).remove_keys(transitive_children(view(old(self).spec()), key)));
+
         let tracked _ = lemma_siblings_none_empty(self.spec());
         assert(view(self.spec())[key].children.len() == 0);
         assert(self.dom() == old(self).dom().difference(revoked_keys));
+        assert(self.dom() ==
+            old(self).dom().difference(transitive_children(view(old(self).spec()), key)).insert(key));
     }
 
     fn borrow_node(&self, key: CapKey) -> (res: &Node)
