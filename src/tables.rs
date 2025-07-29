@@ -7,7 +7,7 @@ use crate::{
 
 verus! {
 
-trait CapabilityMetaMap<Value>: View<V = Map<CapKey, Value>> {
+trait MetaCapTable<Value>: View<V = Map<CapKey, Value>> {
     type SubMap : View<V = Map<CapKey, Value>>;
 
     fn insert(&mut self, k: CapKey, v: Value)
@@ -35,25 +35,25 @@ trait CapabilityMetaMap<Value>: View<V = Map<CapKey, Value>> {
 }
 
 #[verifier::reject_recursive_types(Value)]
-struct HashActionMap<Value> {
-    action_id: ActId,
+struct ActivityCapTable<Value> {
+    activity_id: ActId,
     caps: HashMapWithView<CapId, Value>
 }
 
-impl<Value> View for HashActionMap<Value> {
+impl<Value> View for ActivityCapTable<Value> {
     type V = Map<CapKey, Value>;
 
     closed spec fn view(&self) -> Self::V {
         Map::new(
-            |key: CapKey| key.0 == self.action_id && self.caps@.contains_key(key.1),
+            |key: CapKey| key.0 == self.activity_id && self.caps@.contains_key(key.1),
             |key: CapKey| self.caps@[key.1])
     }
 }
 
 #[verifier::reject_recursive_types(Value)]
-struct HashMetaMap<Value>(MutMap<ActId, HashActionMap<Value>>);
+struct HashMetaCapTable<Value>(MutMap<ActId, ActivityCapTable<Value>>);
 
-impl<Value> View for HashMetaMap<Value> {
+impl<Value> View for HashMetaCapTable<Value> {
     type V = Map<CapKey, Value>;
 
     closed spec fn view(&self) -> Self::V {
@@ -63,15 +63,15 @@ impl<Value> View for HashMetaMap<Value> {
     }
 }
 
-impl<Value> CapabilityMetaMap<Value> for HashMetaMap<Value> {
-    type SubMap = HashActionMap<Value>;
+impl<Value> MetaCapTable<Value> for HashMetaCapTable<Value> {
+    type SubMap = ActivityCapTable<Value>;
 
     fn insert(&mut self, k: CapKey, v: Value)
     {
         if self.0.contains_key(&k.0) {
-            let mut action_map = self.0.take(&k.0, Ghost(Set::empty()));
-            action_map.caps.insert(k.1, v);
-            self.0.untake(&k.0, action_map, Ghost(Set::empty()));
+            let mut table = self.0.take(&k.0, Ghost(Set::empty()));
+            table.caps.insert(k.1, v);
+            self.0.untake(&k.0, table, Ghost(Set::empty()));
 
             assert(self@ == old(self)@.insert(k@, v));
         }
@@ -79,9 +79,9 @@ impl<Value> CapabilityMetaMap<Value> for HashMetaMap<Value> {
             assume(obeys_key_model::<u64>());
             let caps = HashMapWithView::<u64, Value>::new();
 
-            let mut action_map = HashActionMap { action_id: k.0, caps };
-            action_map.caps.insert(k.1, v);
-            self.0.insert(k.0, action_map);
+            let mut table = ActivityCapTable { activity_id: k.0, caps };
+            table.caps.insert(k.1, v);
+            self.0.insert(k.0, table);
 
             assert(self@ == old(self)@.insert(k@, v));
         }

@@ -49,7 +49,7 @@ impl Token for PointsTo<Node> {
 }
 
 struct Meta {
-    map: HashMapWithView<CapKey, PPtr<Node>>,
+    table: HashMapWithView<CapKey, PPtr<Node>>,
     instance: Tracked<LinkSystem::Instance<PointsTo<Node>>>,
     spec: Tracked<LinkSystem::map<PointsTo<Node>>>,
     tokens: Tracked<LinkSystem::all_tokens<PointsTo<Node>>>,
@@ -68,10 +68,10 @@ impl Meta {
     spec fn wf(&self) -> bool {
         &&& self.ties()
         &&& self.state@.value() == SysState::Clean
-        &&& self.dom() == self.map@.dom()
+        &&& self.dom() == self.table@.dom()
         &&& forall|key: CapKey| #[trigger]
-            self.map@.contains_key(key) ==> self.tokens@.value()[key].addr()
-                == self.map@[key].addr() && self.get(key).key == key
+            self.table@.contains_key(key) ==> self.tokens@.value()[key].addr()
+                == self.table@[key].addr() && self.get(key).key == key
     }
 
     fn insert_root(&mut self, key: CapKey)
@@ -93,7 +93,7 @@ impl Meta {
             token,
         );
 
-        self.map.insert(key, ptr);
+        self.table.insert(key, ptr);
     }
 
     fn insert_child(&mut self, parent: CapKey, child: CapKey)
@@ -111,14 +111,14 @@ impl Meta {
             self.instance.borrow().contains_next(parent, self.spec.borrow());
         };
 
-        let parent_ptr = *self.map.get(&parent).unwrap();
+        let parent_ptr = *self.table.get(&parent).unwrap();
         let next = self.borrow_node(parent).child;
 
         let node = Node { key: child, next, child: 0, back: parent_ptr.addr(), first_child: true };
 
         let (ptr, Tracked(token)) = PPtr::new(node);
 
-        self.map.insert(child, ptr);
+        self.table.insert(child, ptr);
 
         proof!{
             token.is_nonnull();
@@ -186,7 +186,7 @@ impl Meta {
                 parent_token
             );
 
-            assert(self.spec().dom() == self.map@.dom());
+            assert(self.spec().dom() == self.table@.dom());
         };
     }
 
@@ -208,7 +208,7 @@ impl Meta {
             self.state.borrow_mut(),
         );
 
-        let ptr = *self.map.get(&key).unwrap();
+        let ptr = *self.table.get(&key).unwrap();
         let node = ptr.take(Tracked(&mut token));
 
         if node.back == 0 {
@@ -263,7 +263,7 @@ impl Meta {
             );
         }
 
-        self.map.remove(&key);
+        self.table.remove(&key);
         ptr.free(Tracked(token));
 
         assert(self.spec().dom() == old(self).spec().dom());
@@ -277,7 +277,7 @@ impl Meta {
 
         let tracked _ = lemma_revoke_spec(old(self).spec(), self.spec(), key);
 
-        assert(self.spec().dom() == self.map@.dom());
+        assert(self.spec().dom() == self.table@.dom());
     }
 
     fn revoke_children(&mut self, key: CapKey)
@@ -382,7 +382,7 @@ impl Meta {
         ensures
             self.get(key) == res,
     {
-        let ptr = self.map.get(&key).unwrap();
+        let ptr = self.table.get(&key).unwrap();
         let tracked borrow = self.instance.borrow().borrow_token(
             key,
             self.spec.borrow(),
@@ -424,7 +424,7 @@ impl Meta {
             transitive_child_of(view(self.spec()), res.key, parent),
     {
         let mut res = self.borrow_node(parent);
-        let mut ptr = *self.map.get(&parent).unwrap();
+        let mut ptr = *self.table.get(&parent).unwrap();
         let ghost mut current = parent;
         let tracked _ = self.instance.borrow().weak_connections(self.spec.borrow());
         let tracked _ = lemma_view_well_formed(self.spec());
