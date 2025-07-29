@@ -88,6 +88,14 @@ impl<Key: View + Eq + Hash, Value> MutMap<Key, Value> {
         Self { m, credits }
     }
 
+    pub fn contains_key(&self, key: &Key) -> bool
+    requires self.wf()
+    returns self@.contains_key(key@)
+    {
+        let tracked _ = self.lemma_dom_credits_eq_dom_m();
+        self.m.contains_key(key)
+    }
+
     spec fn credit_addrs(&self) -> Map<Key::V, CellId> {
         self.credits@.map_values(|v: PointsTo<Value>| v.id())
     }
