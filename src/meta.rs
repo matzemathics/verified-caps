@@ -319,7 +319,7 @@ impl Meta {
             let child = self.first_child(key);
             let tracked _ = self.lemma_child_null_imp_none(child);
 
-            if child.key == key {
+            if child.key.0 == key.0 && child.key.1 == key.1 {
                 break
             }
 

@@ -2,7 +2,9 @@ use vstd::prelude::*;
 
 verus! {
 
-pub type CapKey = u64;
+pub type ActId = u16;
+pub type CapId = u64;
+pub type CapKey = (ActId, CapId);
 
 pub ghost struct LinkedNode {
     pub back: Option<CapKey>,
