@@ -1,5 +1,4 @@
 use vstd::{
-    hash_map::HashMapWithView,
     prelude::*,
     simple_pptr::{PPtr, PointsTo},
 };
@@ -14,6 +13,7 @@ use crate::{
         lemma_revoke_spec, lemma_revoke_transitive_changes, lemma_revoke_transitive_non_changes,
     },
     state::{LinkSystem, SysState, Token},
+    tables::{HashMetaCapTable, MetaCapTable},
     tcb::{
         child_of, get_parent, revoke_single_parent_update, siblings, transitive_child_of,
         transitive_children, view, weak_child_link_condition, CapKey, LinkMap,
@@ -49,7 +49,7 @@ impl Token for PointsTo<Node> {
 }
 
 struct Meta {
-    table: HashMapWithView<CapKey, PPtr<Node>>,
+    table: HashMetaCapTable<PPtr<Node>>,
     instance: Tracked<LinkSystem::Instance<PointsTo<Node>>>,
     spec: Tracked<LinkSystem::map<PointsTo<Node>>>,
     tokens: Tracked<LinkSystem::all_tokens<PointsTo<Node>>>,
@@ -67,6 +67,7 @@ impl Meta {
 
     spec fn wf(&self) -> bool {
         &&& self.ties()
+        &&& self.table.wf()
         &&& self.state@.value() == SysState::Clean
         &&& self.dom() == self.table@.dom()
         &&& forall|key: CapKey| #[trigger]
@@ -111,7 +112,7 @@ impl Meta {
             self.instance.borrow().contains_next(parent, self.spec.borrow());
         };
 
-        let parent_ptr = *self.table.get(&parent).unwrap();
+        let parent_ptr = *self.table.get(parent).unwrap();
         let next = self.borrow_node(parent).child;
 
         let node = Node { key: child, next, child: 0, back: parent_ptr.addr(), first_child: true };
@@ -208,7 +209,7 @@ impl Meta {
             self.state.borrow_mut(),
         );
 
-        let ptr = *self.table.get(&key).unwrap();
+        let ptr = *self.table.get(key).unwrap();
         let node = ptr.take(Tracked(&mut token));
 
         if node.back == 0 {
@@ -263,7 +264,7 @@ impl Meta {
             );
         }
 
-        self.table.remove(&key);
+        self.table.remove(key);
         ptr.free(Tracked(token));
 
         assert(self.spec().dom() == old(self).spec().dom());
@@ -382,7 +383,7 @@ impl Meta {
         ensures
             self.get(key) == res,
     {
-        let ptr = self.table.get(&key).unwrap();
+        let ptr = self.table.get(key).unwrap();
         let tracked borrow = self.instance.borrow().borrow_token(
             key,
             self.spec.borrow(),
@@ -424,7 +425,7 @@ impl Meta {
             transitive_child_of(view(self.spec()), res.key, parent),
     {
         let mut res = self.borrow_node(parent);
-        let mut ptr = *self.table.get(&parent).unwrap();
+        let mut ptr = *self.table.get(parent).unwrap();
         let ghost mut current = parent;
         let tracked _ = self.instance.borrow().weak_connections(self.spec.borrow());
         let tracked _ = lemma_view_well_formed(self.spec());

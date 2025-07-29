@@ -7,7 +7,7 @@ use crate::{
 
 verus! {
 
-trait MetaCapTable<Value>: View<V = Map<CapKey, Value>> {
+pub trait MetaCapTable<Value>: View<V = Map<CapKey, Value>> {
     type SubMap : View<V = Map<CapKey, Value>>;
 
     fn insert(&mut self, k: CapKey, v: Value)
@@ -35,7 +35,7 @@ trait MetaCapTable<Value>: View<V = Map<CapKey, Value>> {
 }
 
 #[verifier::reject_recursive_types(Value)]
-struct ActivityCapTable<Value> {
+pub struct ActivityCapTable<Value> {
     activity_id: ActId,
     caps: HashMapWithView<CapId, Value>
 }
@@ -51,7 +51,7 @@ impl<Value> View for ActivityCapTable<Value> {
 }
 
 #[verifier::reject_recursive_types(Value)]
-struct HashMetaCapTable<Value>(MutMap<ActId, ActivityCapTable<Value>>);
+pub struct HashMetaCapTable<Value>(MutMap<ActId, ActivityCapTable<Value>>);
 
 impl<Value> View for HashMetaCapTable<Value> {
     type V = Map<CapKey, Value>;
@@ -107,7 +107,7 @@ impl<Value> MetaCapTable<Value> for HashMetaCapTable<Value> {
         table.caps.get(&k.1)
     }
 
-    spec fn wf(&self) -> bool {
+    closed spec fn wf(&self) -> bool {
         self.0.wf()
     }
 }
