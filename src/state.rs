@@ -322,6 +322,13 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         }
     }
 
+    property!{
+        depth_bound(key: CapKey) {
+            require pre.map.contains_key(key);
+            assert(pre.map[key].depth < pre.depth);
+        }
+    }
+
     #[invariant]
     pub fn addr_nonnull(&self) -> bool {
         forall |key: CapKey| self.map.contains_key(key) ==>

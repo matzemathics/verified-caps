@@ -1,5 +1,6 @@
 use vstd::{
     prelude::*,
+    set_lib::lemma_len_subset,
     simple_pptr::{PPtr, PointsTo},
 };
 
@@ -67,6 +68,7 @@ impl Meta {
 
     spec fn wf(&self) -> bool {
         &&& self.ties()
+        &&& self.dom().finite()
         &&& self.table.wf()
         &&& self.state@.value() == SysState::Clean
         &&& self.dom() == self.table@.dom()
@@ -316,6 +318,8 @@ impl Meta {
                 ),
             ensures
                 self.spec()[key].child.is_none(),
+            decreases
+                self.dom().len()
         {
             let child = self.first_child(key);
             let tracked _ = self.lemma_child_null_imp_none(child);
@@ -439,6 +443,8 @@ impl Meta {
                 self.get(current) == *res,
                 self.tokens@.value()[current].addr() == ptr.addr(),
                 transitive_child_of(view(self.spec()), current, parent),
+            decreases
+                self.generation@.value() - self.spec()[current].depth
         {
             proof! {
                 self.instance.borrow().contains_child(current, self.spec.borrow());
@@ -451,6 +457,8 @@ impl Meta {
                 assert(siblings(self.spec(), Some(next_current)).last() == next_current);
                 assert(child_of(self.spec(), next_current, current));
                 assert(view(self.spec())[current].children.contains(next_current));
+                assert(self.spec()[next_current].depth > self.spec()[current].depth);
+                self.instance.borrow().depth_bound(next_current, self.spec.borrow(), self.generation.borrow());
 
                 current = next_current;
 
@@ -489,14 +497,26 @@ impl Meta {
             self.wf(),
             self.dom().filter(|key: CapKey| key.0 == activity).is_empty()
     {
+        broadcast use vstd::set::group_set_axioms;
+
         loop
             invariant self.wf()
             ensures self.dom().filter(|key: CapKey| key.0 == activity).is_empty()
+            decreases self.dom().len()
         {
             let Some(cap) = self.cap_in(activity) else { break; };
+            let ghost before = self.dom();
+            assert(before.finite());
 
             self.revoke_children(cap);
+            let ghost here = self.dom();
+            assert(self.dom().subset_of(before));
+            let tracked _ = lemma_len_subset(self.dom(), before);
+            assert(self.dom().len() <= before.len());
+
             self.revoke_single(cap);
+            assert(self.dom() =~= here.remove(cap));
+            assert(self.dom().len() == here.len() - 1);
         }
     }
 
