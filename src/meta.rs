@@ -16,7 +16,7 @@ use crate::{
     tables::{HashMetaCapTable, MetaCapTable},
     tcb::{
         child_of, get_parent, revoke_single_parent_update, siblings, transitive_child_of,
-        transitive_children, view, weak_child_link_condition, CapKey, LinkMap,
+        transitive_children, view, weak_child_link_condition, ActId, CapKey, LinkMap,
     },
 };
 
@@ -470,6 +470,34 @@ impl Meta {
         }
 
         res
+    }
+
+    fn cap_in(&self, activity: ActId) -> (res: Option<CapKey>)
+    requires self.wf()
+    ensures
+        res matches Some(key) ==> key.0 == activity && self.dom().contains(key),
+        res matches None ==> self.dom().filter(|key: CapKey| key.0 == activity).is_empty()
+    {
+        let act_table = self.table.get_act_table(activity)?;
+        act_table.get_element()
+    }
+
+    fn revoke_all(&mut self, activity: ActId)
+        requires
+            old(self).wf(),
+        ensures
+            self.wf(),
+            self.dom().filter(|key: CapKey| key.0 == activity).is_empty()
+    {
+        loop
+            invariant self.wf()
+            ensures self.dom().filter(|key: CapKey| key.0 == activity).is_empty()
+        {
+            let Some(cap) = self.cap_in(activity) else { break; };
+
+            self.revoke_children(cap);
+            self.revoke_single(cap);
+        }
     }
 
     proof fn lemma_next_null_imp_none(tracked &self, node: &Node)

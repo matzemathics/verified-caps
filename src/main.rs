@@ -5,7 +5,7 @@
 #![feature(linked_list_cursors)]
 #![feature(btree_cursors)]
 #![default_lib_allocator]
-#![cfg_attr(not(feature = "linux"), no_std)]
+// #![cfg_attr(not(feature = "linux"), no_std)]
 
 pub extern crate alloc;
 
