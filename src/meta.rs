@@ -16,7 +16,7 @@ use crate::{
     state::{LinkSystem, SysState, Token},
     tables::{HashMetaCapTable, MetaCapTable},
     tcb::{
-        child_of, get_parent, revoke_single_parent_update, siblings, transitive_child_of,
+        get_parent, revoke_single_parent_update, siblings, transitive_child_of,
         transitive_children, view, weak_child_link_condition, ActId, CapKey, LinkMap,
     },
 };
@@ -429,52 +429,43 @@ impl Meta {
             transitive_child_of(view(self.spec()), res.key, parent),
     {
         let mut res = self.borrow_node(parent);
-        let mut ptr = *self.table.get(parent).unwrap();
-        let ghost mut current = parent;
         let tracked _ = self.instance.borrow().weak_connections(self.spec.borrow());
         let tracked _ = lemma_view_well_formed(self.spec());
-        assert(transitive_child_of(view(self.spec()), current, parent));
+        assert(transitive_child_of(view(self.spec()), res.key, parent));
 
         while res.child != 0
             invariant
                 self.wf(),
-                self.contains_key(current),
                 self.contains_key(parent),
-                self.get(current) == *res,
-                self.tokens@.value()[current].addr() == ptr.addr(),
-                transitive_child_of(view(self.spec()), current, parent),
+                self.contains(res),
+                transitive_child_of(view(self.spec()), res.key, parent),
             decreases
-                self.generation@.value() - self.spec()[current].depth
+                self.generation@.value() - self.spec()[res.key].depth
         {
-            proof! {
-                self.instance.borrow().contains_child(current, self.spec.borrow());
-                self.instance.borrow().token_invariant(current, self.spec.borrow(), self.tokens.borrow());
+            let tracked token = {
+                self.instance.borrow().contains_child(res.key, self.spec.borrow());
+                self.instance.borrow().token_invariant(res.key, self.spec.borrow(), self.tokens.borrow());
 
-                let next_current = self.spec()[current].child.unwrap();
+                let ghost next = self.spec()[res.key].child.unwrap();
                 self.instance.borrow().weak_connections(self.spec.borrow());
-                lemma_siblings_unfold(self.spec(), next_current);
-                assert(weak_child_link_condition(self.spec(), current));
-                assert(siblings(self.spec(), Some(next_current)).last() == next_current);
-                assert(child_of(self.spec(), next_current, current));
-                assert(view(self.spec())[current].children.contains(next_current));
-                assert(self.spec()[next_current].depth > self.spec()[current].depth);
-                self.instance.borrow().depth_bound(next_current, self.spec.borrow(), self.generation.borrow());
+                lemma_siblings_unfold(self.spec(), next);
+                assert(weak_child_link_condition(self.spec(), res.key));
+                assert(siblings(self.spec(), Some(next)).last() == next);
+                assert(view(self.spec())[res.key].children.contains(next));
+                self.instance.borrow().depth_bound(next, self.spec.borrow(), self.generation.borrow());
 
-                current = next_current;
-
-                let tracked _ = lemma_view_well_formed(self.spec());
-                assert(transitive_child_of(view(self.spec()), current, parent));
-                self.instance.borrow().token_invariant(current, self.spec.borrow(), self.tokens.borrow());
+                lemma_view_well_formed(self.spec());
+                assert(transitive_child_of(view(self.spec()), next, parent));
+                self.instance.borrow().token_invariant(next, self.spec.borrow(), self.tokens.borrow());
+                self.instance.borrow().borrow_token(
+                    next,
+                    self.spec.borrow(),
+                    self.tokens.borrow(),
+                    self.state.borrow(),
+                )
             };
-            let tracked token = self.instance.borrow().borrow_token(
-                current,
-                self.spec.borrow(),
-                self.tokens.borrow(),
-                self.state.borrow(),
-            );
 
-            ptr = PPtr::from_addr(res.child);
-            res = ptr.borrow(Tracked(token));
+            res = PPtr::from_addr(res.child).borrow(Tracked(token));
         }
 
         res
