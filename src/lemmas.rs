@@ -6,8 +6,8 @@ use crate::{
     },
     tcb::{
         child_of, connection_condition, decreasing, decreasing_condition, get_parent,
-        map_connected, sibling_of, siblings, transitive_child_of, view, weak_child_connected,
-        CapKey, CapMap, Child, LinkMap, Next,
+        map_connected, sibling_of, siblings, transitive_child_of, view, CapKey, CapMap, Child,
+        LinkMap, Next,
     },
 };
 
@@ -291,7 +291,7 @@ pub proof fn lemma_predecessor_transitive(
 pub proof fn lemma_child_of_first_child(map: LinkMap, parent: CapKey)
     requires
         decreasing::<Next>(map),
-        weak_child_connected(map),
+        decreasing::<Child>(map),
         map.contains_key(parent),
         map[parent].child.is_some(),
     ensures
@@ -327,7 +327,7 @@ pub proof fn lemma_siblings_depth(map: LinkMap, a: CapKey, b: CapKey)
 pub proof fn lemma_child_of_depth(map: LinkMap, child: CapKey, parent: CapKey)
     requires
         child_of(map, child, parent),
-        weak_child_connected(map),
+        decreasing::<Child>(map),
         decreasing::<Next>(map),
         map.contains_key(parent),
     ensures
@@ -494,7 +494,7 @@ pub proof fn lemma_sib_back_some(map: LinkMap, start: CapKey, child: CapKey)
 pub proof fn lemma_view_well_formed(map: LinkMap)
     requires
         decreasing::<Next>(map),
-        weak_child_connected(map),
+        decreasing::<Child>(map),
     ensures
         map_connected(view(map)),
 {

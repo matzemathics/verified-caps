@@ -1,7 +1,7 @@
 use state_machines_macros::tokenized_state_machine;
 use vstd::prelude::*;
 
-use crate::tcb::{decreasing, next_index, weak_child_connected, CapKey, LinkMap, LinkedNode, Next};
+use crate::tcb::{decreasing, next_index, CapKey, Child, LinkMap, LinkedNode, Next};
 
 verus! {
 
@@ -315,7 +315,7 @@ tokenized_state_machine!(LinkSystem<T: Token>{
 
     property!{
         weak_connections() {
-            assert(weak_child_connected(pre.map));
+            assert(decreasing::<Child>(pre.map));
             assert(decreasing::<Next>(pre.map));
         }
     }

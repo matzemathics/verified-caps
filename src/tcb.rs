@@ -169,10 +169,6 @@ pub open spec fn transitive_children(map: CapMap, parent: CapKey) -> Set<CapKey>
     map.dom().filter(|node| transitive_child_of(map, node, parent))
 }
 
-pub open spec fn weak_child_connected(map: LinkMap) -> bool {
-    forall|key: CapKey| map.contains_key(key) ==> #[trigger] decreasing_condition::<Child>(map, key)
-}
-
 pub open spec fn insert_child(map: CapMap, parent: CapKey, child: CapKey) -> CapMap {
     let CapNode { generation, children } = map[parent];
     let parent_node = CapNode { children: children.push(child), generation };

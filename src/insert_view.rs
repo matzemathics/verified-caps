@@ -3,8 +3,8 @@ use vstd::prelude::*;
 use crate::{
     lemmas::{lemma_siblings_none_empty, lemma_siblings_unchanged, lemma_siblings_unfold},
     tcb::{
-        decreasing, decreasing_condition, insert_child, next_index, siblings, view,
-        weak_child_connected, CapKey, CapNode, Child, LinkMap, LinkedNode, Next,
+        decreasing, decreasing_condition, insert_child, next_index, siblings, view, CapKey,
+        CapNode, Child, LinkMap, LinkedNode, Next,
     },
 };
 
@@ -99,7 +99,7 @@ impl OpInsertChild {
             !map.contains_key(self.child),
             map.contains_key(self.parent),
             decreasing::<Next>(map),
-            weak_child_connected(map),
+            decreasing::<Child>(map),
         ensures
             view(self.child_update(map)) == view(map).insert(
                 self.child,
@@ -159,7 +159,7 @@ impl OpInsertChild {
         requires
             map.contains_key(self.parent),
             decreasing::<Next>(map),
-            weak_child_connected(map),
+            decreasing::<Child>(map),
         ensures
             view(self.next_update(map)) == view(map),
     {
@@ -187,7 +187,7 @@ impl OpInsertChild {
 
     pub open spec fn invariants(&self, map: LinkMap) -> bool {
         &&& map.contains_key(self.parent)
-        &&& weak_child_connected(map)
+        &&& decreasing::<Child>(map)
         &&& decreasing::<Next>(map)
     }
 
@@ -217,7 +217,7 @@ impl OpInsertChild {
             self.invariants(map),
             !map.contains_key(self.child),
         ensures
-            weak_child_connected(self.child_update(map)),
+            decreasing::<Child>(self.child_update(map)),
     {
         assert forall|key: CapKey|
             self.child_update(map).contains_key(key) implies #[trigger] decreasing_condition::<Child>(
