@@ -5,9 +5,9 @@ use crate::{
         back_link_condition, child_link_condition, clean_links, next_link_condition, SysState,
     },
     tcb::{
-        child_of, connection_condition, decreasing_condition, get_parent, map_connected,
-        sibling_of, siblings, transitive_child_of, view, weak_child_connected,
-        weak_child_link_condition, weak_next_connected, CapKey, CapMap, LinkMap, Next
+        child_of, connection_condition, decreasing, decreasing_condition, get_parent,
+        map_connected, sibling_of, siblings, transitive_child_of, view, weak_child_connected,
+        weak_child_link_condition, CapKey, CapMap, LinkMap, Next,
     },
 };
 
@@ -15,7 +15,7 @@ verus! {
 
 pub proof fn lemma_siblings_contained(map: LinkMap, link: Option<CapKey>, key: CapKey)
     requires
-        weak_next_connected(map),
+        decreasing::<Next>(map),
         link.is_some() ==> map.contains_key(link.unwrap()),
         siblings(map, link).contains(key),
     ensures
@@ -42,7 +42,7 @@ pub proof fn lemma_siblings_none_empty(map: LinkMap)
 
 pub proof fn lemma_siblings_unfold(map: LinkMap, key: CapKey)
     requires
-        weak_next_connected(map),
+        decreasing::<Next>(map),
         map.contains_key(key),
     ensures
         siblings(map, Some(key)) == siblings(map, map[key].next).push(key),
@@ -53,7 +53,7 @@ pub proof fn lemma_siblings_unfold(map: LinkMap, key: CapKey)
 pub proof fn lemma_siblings_take_n(map: LinkMap, key: CapKey, n: int)
     requires
         map.contains_key(key),
-        weak_next_connected(map),
+        decreasing::<Next>(map),
         0 <= n < siblings(map, Some(key)).len(),
     ensures
         map.contains_key(siblings(map, Some(key))[n]),
@@ -79,8 +79,8 @@ pub proof fn lemma_siblings_take_n(map: LinkMap, key: CapKey, n: int)
 pub proof fn lemma_siblings_unchanged(map_a: LinkMap, map_b: LinkMap, key: CapKey)
     requires
         forall|key: CapKey| #[trigger] map_a[key].next == map_b[key].next,
-        weak_next_connected(map_a),
-        weak_next_connected(map_b),
+        decreasing::<Next>(map_a),
+        decreasing::<Next>(map_b),
         map_a.contains_key(key),
         map_b.contains_key(key),
     ensures
@@ -104,8 +104,8 @@ pub proof fn lemma_siblings_unchanged_after(pre: LinkMap, post: LinkMap, key: Ca
     requires
         forall|sib: CapKey| #[trigger]
             siblings(pre, Some(key)).contains(sib) ==> pre[sib].next == post[sib].next,
-        weak_next_connected(pre),
-        weak_next_connected(post),
+        decreasing::<Next>(pre),
+        decreasing::<Next>(post),
         pre.contains_key(key),
         post.contains_key(key),
     ensures
@@ -152,7 +152,7 @@ pub proof fn lemma_siblings_unchanged_after(pre: LinkMap, post: LinkMap, key: Ca
 
 pub proof fn lemma_siblings_decreasing(map: LinkMap, key: CapKey, sib: CapKey)
     requires
-        weak_next_connected(map),
+        decreasing::<Next>(map),
         map.contains_key(key),
         siblings(map, map[key].next).contains(sib),
     ensures
@@ -174,7 +174,7 @@ pub proof fn lemma_siblings_decreasing(map: LinkMap, key: CapKey, sib: CapKey)
 
 pub proof fn lemma_siblings_no_loop(map: LinkMap, key: CapKey)
     requires
-        weak_next_connected(map),
+        decreasing::<Next>(map),
         map.contains_key(key),
     ensures
         !siblings(map, map[key].next).contains(key),
@@ -290,7 +290,7 @@ pub proof fn lemma_predecessor_transitive(
 
 pub proof fn lemma_child_of_first_child(map: LinkMap, parent: CapKey)
     requires
-        weak_next_connected(map),
+        decreasing::<Next>(map),
         weak_child_connected(map),
         map.contains_key(parent),
         map[parent].child.is_some(),
@@ -305,7 +305,7 @@ pub proof fn lemma_child_of_first_child(map: LinkMap, parent: CapKey)
 pub proof fn lemma_siblings_depth(map: LinkMap, a: CapKey, b: CapKey)
     requires
         siblings(map, Some(a)).contains(b),
-        weak_next_connected(map),
+        decreasing::<Next>(map),
         map.contains_key(a),
     ensures
         map[a].depth == map[b].depth,
@@ -328,7 +328,7 @@ pub proof fn lemma_child_of_depth(map: LinkMap, child: CapKey, parent: CapKey)
     requires
         child_of(map, child, parent),
         weak_child_connected(map),
-        weak_next_connected(map),
+        decreasing::<Next>(map),
         map.contains_key(parent),
     ensures
         map[child].depth == map[parent].depth + 1,
@@ -446,7 +446,7 @@ pub proof fn lemma_siblings_unchanged_local(
         !sibling_of(pre, changed, key),
         pre.contains_key(key),
         post.contains_key(key),
-        weak_next_connected(post),
+        decreasing::<Next>(post),
         clean_links(pre),
     ensures
         siblings(pre, Some(key)) == siblings(post, Some(key)),
@@ -493,7 +493,7 @@ pub proof fn lemma_sib_back_some(map: LinkMap, start: CapKey, child: CapKey)
 
 pub proof fn lemma_view_well_formed(map: LinkMap)
     requires
-        weak_next_connected(map),
+        decreasing::<Next>(map),
         weak_child_connected(map),
     ensures
         map_connected(view(map)),

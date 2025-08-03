@@ -3,8 +3,9 @@ use vstd::prelude::*;
 use crate::{
     lemmas::{lemma_siblings_none_empty, lemma_siblings_unchanged, lemma_siblings_unfold},
     tcb::{
-        decreasing_condition, insert_child, next_index, siblings, view, weak_child_connected,
-        weak_child_link_condition, weak_next_connected, CapKey, CapNode, LinkMap, LinkedNode, Next,
+        decreasing, decreasing_condition, insert_child, next_index, siblings, view,
+        weak_child_connected, weak_child_link_condition, CapKey, CapNode, LinkMap, LinkedNode,
+        Next,
     },
 };
 
@@ -14,7 +15,7 @@ pub proof fn lemma_insert_siblings_unchanged(map: LinkMap, new: (CapKey, LinkedN
     requires
         !map.contains_key(new.0),
         map.contains_key(key),
-        weak_next_connected(map),
+        decreasing::<Next>(map),
         decreasing_condition::<Next>(map.insert(new.0, new.1), new.0),
     ensures
         siblings(map, Some(key)) == siblings(map.insert(new.0, new.1), Some(key)),
@@ -33,7 +34,7 @@ pub proof fn lemma_insert_siblings_unchanged(map: LinkMap, new: (CapKey, LinkedN
         }
     };
 
-    assert(weak_next_connected(map.insert(new.0, new.1)));
+    assert(decreasing::<Next>(map.insert(new.0, new.1)));
 
     if let Some(next) = map[key].next {
         assert(decreasing_condition::<Next>(map, key));
@@ -98,7 +99,7 @@ impl OpInsertChild {
         requires
             !map.contains_key(self.child),
             map.contains_key(self.parent),
-            weak_next_connected(map),
+            decreasing::<Next>(map),
             weak_child_connected(map),
         ensures
             view(self.child_update(map)) == view(map).insert(
@@ -158,7 +159,7 @@ impl OpInsertChild {
     proof fn lemma_view_next_update(&self, map: LinkMap)
         requires
             map.contains_key(self.parent),
-            weak_next_connected(map),
+            decreasing::<Next>(map),
             weak_child_connected(map),
         ensures
             view(self.next_update(map)) == view(map),
@@ -188,7 +189,7 @@ impl OpInsertChild {
     pub open spec fn invariants(&self, map: LinkMap) -> bool {
         &&& map.contains_key(self.parent)
         &&& weak_child_connected(map)
-        &&& weak_next_connected(map)
+        &&& decreasing::<Next>(map)
     }
 
     proof fn lemma_weak_next_update_child(&self, map: LinkMap)
@@ -196,7 +197,7 @@ impl OpInsertChild {
             self.invariants(map),
             !map.contains_key(self.child),
         ensures
-            weak_next_connected(self.child_update(map)),
+            decreasing::<Next>(self.child_update(map)),
     {
         assert forall|key: CapKey|
             self.child_update(map).contains_key(key) implies #[trigger] decreasing_condition::<Next>(
@@ -286,7 +287,7 @@ impl OpInsertChild {
         assert(view(checkpoint) == view(map).insert(self.child, self.insert_view_node(map)));
 
         self.lemma_invariants_update_parent(checkpoint);
-        assert(weak_next_connected(self.update(map)));
+        assert(decreasing::<Next>(self.update(map)));
 
         assert forall|key: CapKey| self.update(map).contains_key(key) implies #[trigger] siblings(
             checkpoint,

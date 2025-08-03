@@ -9,9 +9,9 @@ use crate::{
     },
     state::{back_link_condition, clean_links, SysState},
     tcb::{
-        child_of, connection_condition, decreasing_condition, get_parent, map_connected,
-        revoke_single_parent_update, sibling_of, siblings, transitive_child_of,
-        transitive_children, view, weak_next_connected, CapKey, LinkMap, Next,
+        child_of, connection_condition, decreasing, decreasing_condition, get_parent,
+        map_connected, revoke_single_parent_update, sibling_of, siblings, transitive_child_of,
+        transitive_children, view, CapKey, LinkMap, Next,
     },
 };
 
@@ -55,8 +55,8 @@ pub open spec fn revoke_next_update(pre: LinkMap, post: LinkMap, removed: CapKey
 
 pub proof fn lemma_siblings_jump(pre: LinkMap, post: LinkMap, start: CapKey, jump: CapKey)
     requires
-        weak_next_connected(pre),
-        weak_next_connected(post),
+        decreasing::<Next>(pre),
+        decreasing::<Next>(post),
         forall|key: CapKey|
             post.contains_key(key) && key != jump ==> #[trigger] post[key].next == pre[key].next,
         pre.contains_key(jump),
@@ -161,7 +161,7 @@ pub proof fn lemma_revoke_spec(pre: LinkMap, post: LinkMap, removed: CapKey)
     requires
         post.dom() == pre.dom().remove(removed),
         clean_links(pre),
-        weak_next_connected(post),
+        decreasing::<Next>(post),
         pre[removed].child.is_none(),
         forall|key: CapKey|
             pre.contains_key(key) && !close_to(pre, removed, key) ==> #[trigger] pre[key]

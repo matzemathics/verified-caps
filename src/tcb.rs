@@ -77,7 +77,7 @@ proof fn siblings_decreases(map: LinkMap, link: Option<CapKey>) {
 pub open spec fn siblings(map: LinkMap, link: Option<CapKey>) -> Seq<CapKey>
     decreases next_index(map, link),
     when {
-    &&& weak_next_connected(map)
+    &&& decreasing::<Next>(map)
     &&& link.is_some() ==> map.contains_key(link.unwrap())
 }
     via siblings_decreases
@@ -97,8 +97,8 @@ pub open spec fn next_index(map: LinkMap, key: Option<CapKey>) -> nat {
     }
 }
 
-pub open spec fn weak_next_connected(map: LinkMap) -> bool {
-    forall|key: CapKey| map.contains_key(key) ==> #[trigger] decreasing_condition::<Next>(map, key)
+pub open spec fn decreasing<F: DecreasingFunction<LinkedNode, Result = Option<CapKey>>>(map: LinkMap) -> bool {
+    forall|key: CapKey| map.contains_key(key) ==> #[trigger] decreasing_condition::<F>(map, key)
 }
 
 pub open spec fn get_parent(map: LinkMap, child: CapKey) -> Option<CapKey> {
