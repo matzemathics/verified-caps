@@ -36,7 +36,7 @@ impl LinkedNode {
     }
 }
 
-pub trait DecreasingFunction<T> {
+pub trait MonotonicFunction<T> {
     type Result;
 
     spec fn apply(it: T) -> Self::Result;
@@ -44,7 +44,7 @@ pub trait DecreasingFunction<T> {
 }
 
 pub struct Next;
-impl DecreasingFunction<LinkedNode> for Next {
+impl MonotonicFunction<LinkedNode> for Next {
     type Result = Option<CapKey>;
 
     open spec fn apply(it: LinkedNode) -> Self::Result {
@@ -57,7 +57,7 @@ impl DecreasingFunction<LinkedNode> for Next {
 }
 
 pub struct Child;
-impl DecreasingFunction<LinkedNode> for Child {
+impl MonotonicFunction<LinkedNode> for Child {
     type Result = Option<CapKey>;
 
     open spec fn apply(it: LinkedNode) -> Self::Result {
@@ -69,7 +69,7 @@ impl DecreasingFunction<LinkedNode> for Child {
     }
 }
 
-pub open spec fn decreasing_condition<F: DecreasingFunction<LinkedNode, Result = Option<CapKey>>>(map: LinkMap, key: CapKey) -> bool {
+pub open spec fn decreasing_condition<F: MonotonicFunction<LinkedNode, Result = Option<CapKey>>>(map: LinkMap, key: CapKey) -> bool {
     match F::apply(map[key]) {
         Some(next) => {
             &&& map.contains_key(next)
@@ -109,7 +109,7 @@ pub open spec fn next_index(map: LinkMap, key: Option<CapKey>) -> nat {
     }
 }
 
-pub open spec fn decreasing<F: DecreasingFunction<LinkedNode, Result = Option<CapKey>>>(map: LinkMap) -> bool {
+pub open spec fn decreasing<F: MonotonicFunction<LinkedNode, Result = Option<CapKey>>>(map: LinkMap) -> bool {
     forall|key: CapKey| map.contains_key(key) ==> #[trigger] decreasing_condition::<F>(map, key)
 }
 
