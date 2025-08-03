@@ -40,7 +40,7 @@ pub trait DecreasingFunction<T> {
     type Result;
 
     spec fn apply(it: T) -> Self::Result;
-    spec fn measure(it: T) -> nat;
+    spec fn condition(a: T, b: T) -> bool;
 }
 
 pub struct Next;
@@ -51,8 +51,21 @@ impl DecreasingFunction<LinkedNode> for Next {
         it.next
     }
 
-    open spec fn measure(it: LinkedNode) -> nat {
-        it.index
+    open spec fn condition(a: LinkedNode, b: LinkedNode) -> bool {
+        a.index > b.index && a.depth == b.depth
+    }
+}
+
+pub struct Child;
+impl DecreasingFunction<LinkedNode> for Child {
+    type Result = Option<CapKey>;
+
+    open spec fn apply(it: LinkedNode) -> Self::Result {
+        it.child
+    }
+
+    open spec fn condition(a: LinkedNode, b: LinkedNode) -> bool {
+        a.depth + 1 == b.depth
     }
 }
 
@@ -60,8 +73,7 @@ pub open spec fn decreasing_condition<F: DecreasingFunction<LinkedNode, Result =
     match F::apply(map[key]) {
         Some(next) => {
             &&& map.contains_key(next)
-            &&& map[key].depth == map[next].depth
-            &&& map[key].index > map[next].index
+            &&& F::condition(map[key], map[next])
         }
         None => true
     }
@@ -157,21 +169,8 @@ pub open spec fn transitive_children(map: CapMap, parent: CapKey) -> Set<CapKey>
     map.dom().filter(|node| transitive_child_of(map, node, parent))
 }
 
-pub open spec fn weak_child_link_condition(map: LinkMap, key: CapKey) -> bool {
-    if map[key].child.is_none() {
-        true
-    } else {
-        let child = map[key].child.unwrap();
-        {
-            &&& child != key
-            &&& map.contains_key(child)
-            &&& map[key].depth + 1 == map[child].depth
-        }
-    }
-}
-
 pub open spec fn weak_child_connected(map: LinkMap) -> bool {
-    forall|key: CapKey| map.contains_key(key) ==> #[trigger] weak_child_link_condition(map, key)
+    forall|key: CapKey| map.contains_key(key) ==> #[trigger] decreasing_condition::<Child>(map, key)
 }
 
 pub open spec fn insert_child(map: CapMap, parent: CapKey, child: CapKey) -> CapMap {

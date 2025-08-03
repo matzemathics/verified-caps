@@ -4,8 +4,7 @@ use crate::{
     lemmas::{lemma_siblings_none_empty, lemma_siblings_unchanged, lemma_siblings_unfold},
     tcb::{
         decreasing, decreasing_condition, insert_child, next_index, siblings, view,
-        weak_child_connected, weak_child_link_condition, CapKey, CapNode, LinkMap, LinkedNode,
-        Next,
+        weak_child_connected, CapKey, CapNode, Child, LinkMap, LinkedNode, Next,
     },
 };
 
@@ -120,7 +119,7 @@ impl OpInsertChild {
                 assert(self.child_update(map)[self.child].next.is_none());
             } else {
                 let next = map[self.parent].child.unwrap();
-                assert(weak_child_link_condition(map, self.parent));
+                assert(decreasing_condition::<Child>(map, self.parent));
             }
         };
 
@@ -144,7 +143,7 @@ impl OpInsertChild {
             if map[key].child.is_none() {
             } else {
                 let child = map[key].child.unwrap();
-                assert(weak_child_link_condition(map, key));
+                assert(decreasing_condition::<Child>(map, key));
                 assert(map.contains_key(child));
                 assert(siblings(map, Some(child)) == siblings(self.child_update(map), Some(child)));
             }
@@ -174,13 +173,13 @@ impl OpInsertChild {
                     lemma_siblings_none_empty(map);
                     lemma_siblings_none_empty(self.next_update(map));
                 } else {
-                    assert(weak_child_link_condition(map, key));
+                    assert(decreasing_condition::<Child>(map, key));
                     self.lemma_invariants_update_next(map);
                     lemma_siblings_unchanged(map, self.next_update(map), map[key].child.unwrap());
                 }
             };
 
-            assert(weak_child_link_condition(map, self.parent));
+            assert(decreasing_condition::<Child>(map, self.parent));
             assert(view(map).dom() =~= view(self.next_update(map)).dom());
             assert(view(self.next_update(map)) =~= view(map));
         }
@@ -205,7 +204,7 @@ impl OpInsertChild {
             key,
         ) by {
             if key == self.child {
-                assert(weak_child_link_condition(map, self.parent));
+                assert(decreasing_condition::<Child>(map, self.parent));
                 assert(decreasing_condition::<Next>(self.child_update(map), self.child));
             } else {
                 assert(decreasing_condition::<Next>(map, key));
@@ -221,13 +220,13 @@ impl OpInsertChild {
             weak_child_connected(self.child_update(map)),
     {
         assert forall|key: CapKey|
-            self.child_update(map).contains_key(key) implies #[trigger] weak_child_link_condition(
+            self.child_update(map).contains_key(key) implies #[trigger] decreasing_condition::<Child>(
             self.child_update(map),
             key,
         ) by {
             if key == self.child {
             } else {
-                assert(weak_child_link_condition(map, key));
+                assert(decreasing_condition::<Child>(map, key));
             }
         };
     }
@@ -240,11 +239,11 @@ impl OpInsertChild {
     {
         assert forall|key: CapKey| #[trigger] self.next_update(map).contains_key(key) implies {
             &&& decreasing_condition::<Next>(self.next_update(map), key)
-            &&& weak_child_link_condition(self.next_update(map), key)
+            &&& decreasing_condition::<Child>(self.next_update(map), key)
         } by {
-            assert(weak_child_link_condition(map, self.parent));
+            assert(decreasing_condition::<Child>(map, self.parent));
             assert(decreasing_condition::<Next>(map, key));
-            assert(weak_child_link_condition(map, key));
+            assert(decreasing_condition::<Child>(map, key));
         };
     }
 
@@ -258,14 +257,14 @@ impl OpInsertChild {
     {
         assert forall|key: CapKey| #[trigger] self.parent_update(map).contains_key(key) implies {
             &&& decreasing_condition::<Next>(self.parent_update(map), key)
-            &&& weak_child_link_condition(self.parent_update(map), key)
+            &&& decreasing_condition::<Child>(self.parent_update(map), key)
         } by {
             assert(decreasing_condition::<Next>(map, key));
 
             if key == self.parent {
-                assert(weak_child_link_condition(self.parent_update(map), self.parent));
+                assert(decreasing_condition::<Child>(self.parent_update(map), self.parent));
             } else {
-                assert(weak_child_link_condition(map, key));
+                assert(decreasing_condition::<Child>(map, key));
             };
         };
     }
@@ -306,10 +305,10 @@ impl OpInsertChild {
             self.update(map),
         )[key] == view(checkpoint)[key] by {
             assert(self.update(map)[key] == checkpoint[key]);
-            assert(weak_child_link_condition(checkpoint, key));
+            assert(decreasing_condition::<Child>(checkpoint, key));
         };
 
-        assert(weak_child_link_condition(self.update(map), self.parent));
+        assert(decreasing_condition::<Child>(self.update(map), self.parent));
         let CapNode { generation, children } = view(map)[self.parent];
         let parent_node = CapNode { generation, children: children.push(self.child) };
         let child_node = CapNode { generation: generation + 1, children: Seq::empty() };

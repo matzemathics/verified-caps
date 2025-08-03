@@ -16,8 +16,8 @@ use crate::{
     state::{LinkSystem, SysState, Token},
     tables::{HashMetaCapTable, MetaCapTable},
     tcb::{
-        get_parent, revoke_single_parent_update, siblings, transitive_child_of,
-        transitive_children, view, weak_child_link_condition, ActId, CapKey, LinkMap,
+        decreasing_condition, get_parent, revoke_single_parent_update, siblings,
+        transitive_child_of, transitive_children, view, ActId, CapKey, Child, LinkMap,
     },
 };
 
@@ -445,11 +445,13 @@ impl Meta {
             let tracked token = {
                 self.instance.borrow().contains_child(res.key, self.spec.borrow());
                 self.instance.borrow().token_invariant(res.key, self.spec.borrow(), self.tokens.borrow());
-
                 let ghost next = self.spec()[res.key].child.unwrap();
+
                 self.instance.borrow().weak_connections(self.spec.borrow());
                 lemma_siblings_unfold(self.spec(), next);
-                assert(weak_child_link_condition(self.spec(), res.key));
+                assert(self.spec()[res.key].depth < self.spec()[next].depth) by {
+                    assert(decreasing_condition::<Child>(self.spec(), res.key));
+                };
                 assert(siblings(self.spec(), Some(next)).last() == next);
                 assert(view(self.spec())[res.key].children.contains(next));
                 self.instance.borrow().depth_bound(next, self.spec.borrow(), self.generation.borrow());

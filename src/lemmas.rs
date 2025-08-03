@@ -7,7 +7,7 @@ use crate::{
     tcb::{
         child_of, connection_condition, decreasing, decreasing_condition, get_parent,
         map_connected, sibling_of, siblings, transitive_child_of, view, weak_child_connected,
-        weak_child_link_condition, CapKey, CapMap, LinkMap, Next,
+        CapKey, CapMap, Child, LinkMap, Next,
     },
 };
 
@@ -297,7 +297,7 @@ pub proof fn lemma_child_of_first_child(map: LinkMap, parent: CapKey)
     ensures
         child_of(map, map[parent].child.unwrap(), parent),
 {
-    assert(weak_child_link_condition(map, parent));
+    assert(decreasing_condition::<Child>(map, parent));
     lemma_siblings_unfold(map, map[parent].child.unwrap());
     assert(siblings(map, map[parent].child).last() == map[parent].child.unwrap());
 }
@@ -334,7 +334,7 @@ pub proof fn lemma_child_of_depth(map: LinkMap, child: CapKey, parent: CapKey)
         map[child].depth == map[parent].depth + 1,
 {
     if let Some(first_child) = map[parent].child {
-        assert(weak_child_link_condition(map, parent));
+        assert(decreasing_condition::<Child>(map, parent));
         lemma_siblings_depth(map, first_child, child);
     } else {
         lemma_siblings_none_empty(map)
@@ -501,7 +501,7 @@ pub proof fn lemma_view_well_formed(map: LinkMap)
     assert forall|parent: CapKey, child: CapKey| connection_condition(view(map), child, parent) by {
         if view(map).contains_key(parent) && view(map)[parent].children.contains(child) {
             assert(child_of(map, child, parent));
-            assert(weak_child_link_condition(map, parent));
+            assert(decreasing_condition::<Child>(map, parent));
             lemma_child_of_depth(map, child, parent);
             lemma_siblings_contained(map, map[parent].child, child);
         }
