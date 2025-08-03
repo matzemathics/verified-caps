@@ -9,9 +9,9 @@ use crate::{
     },
     state::{back_link_condition, clean_links, SysState},
     tcb::{
-        child_of, connection_condition, get_parent, map_connected, revoke_single_parent_update,
-        sibling_of, siblings, transitive_child_of, transitive_children, view, weak_next_connected,
-        weak_next_link_condition, CapKey, LinkMap,
+        child_of, connection_condition, decreasing_condition, get_parent, map_connected,
+        revoke_single_parent_update, sibling_of, siblings, transitive_child_of,
+        transitive_children, view, weak_next_connected, CapKey, LinkMap, Next,
     },
 };
 
@@ -71,14 +71,14 @@ pub proof fn lemma_siblings_jump(pre: LinkMap, post: LinkMap, start: CapKey, jum
         ),
     decreases pre[start].index,
 {
-    assert(weak_next_link_condition(pre, jump));
+    assert(decreasing_condition::<Next>(pre, jump));
     let removed = pre[jump].next.unwrap();
 
     if start == jump {
         if let Some(next) = post[jump].next {
-            assert(weak_next_link_condition(post, jump));
-            assert(weak_next_link_condition(pre, jump));
-            assert(weak_next_link_condition(pre, pre[jump].next.unwrap()));
+            assert(decreasing_condition::<Next>(post, jump));
+            assert(decreasing_condition::<Next>(pre, jump));
+            assert(decreasing_condition::<Next>(pre, pre[jump].next.unwrap()));
 
             assert forall|after: CapKey| #[trigger] siblings(pre, Some(next)).contains(after)
             implies post[after].next == pre[after].next by {
@@ -124,14 +124,14 @@ pub proof fn lemma_siblings_jump(pre: LinkMap, post: LinkMap, start: CapKey, jum
 
         assert(critical.push(removed).push(jump).remove_value(removed) == critical.push(jump));
     } else {
-        assert(weak_next_link_condition(pre, jump));
+        assert(decreasing_condition::<Next>(pre, jump));
         lemma_siblings_unfold(pre, start);
         lemma_siblings_decreasing(pre, start, jump);
         assert(removed != start);
         lemma_siblings_unfold(post, start);
 
-        assert(weak_next_link_condition(pre, start));
-        assert(weak_next_link_condition(post, start));
+        assert(decreasing_condition::<Next>(pre, start));
+        assert(decreasing_condition::<Next>(post, start));
         let next = pre[start].next.unwrap();
         lemma_siblings_jump(pre, post, next, jump);
 

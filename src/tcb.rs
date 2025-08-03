@@ -36,24 +36,41 @@ impl LinkedNode {
     }
 }
 
-pub open spec fn weak_next_link_condition(map: LinkMap, key: CapKey) -> bool {
-    if map[key].next.is_none() {
-        true
-    } else {
-        let next = map[key].next.unwrap();
-        {
-            &&& next != key
+pub trait DecreasingFunction<T> {
+    type Result;
+
+    spec fn apply(it: T) -> Self::Result;
+    spec fn measure(it: T) -> nat;
+}
+
+pub struct Next;
+impl DecreasingFunction<LinkedNode> for Next {
+    type Result = Option<CapKey>;
+
+    open spec fn apply(it: LinkedNode) -> Self::Result {
+        it.next
+    }
+
+    open spec fn measure(it: LinkedNode) -> nat {
+        it.index
+    }
+}
+
+pub open spec fn decreasing_condition<F: DecreasingFunction<LinkedNode, Result = Option<CapKey>>>(map: LinkMap, key: CapKey) -> bool {
+    match F::apply(map[key]) {
+        Some(next) => {
             &&& map.contains_key(next)
             &&& map[key].depth == map[next].depth
             &&& map[key].index > map[next].index
         }
+        None => true
     }
 }
 
 #[via_fn]
 proof fn siblings_decreases(map: LinkMap, link: Option<CapKey>) {
     if let Some(key) = link {
-        assert(weak_next_link_condition(map, key))
+        assert(decreasing_condition::<Next>(map, key))
     }
 }
 
@@ -81,7 +98,7 @@ pub open spec fn next_index(map: LinkMap, key: Option<CapKey>) -> nat {
 }
 
 pub open spec fn weak_next_connected(map: LinkMap) -> bool {
-    forall|key: CapKey| map.contains_key(key) ==> #[trigger] weak_next_link_condition(map, key)
+    forall|key: CapKey| map.contains_key(key) ==> #[trigger] decreasing_condition::<Next>(map, key)
 }
 
 pub open spec fn get_parent(map: LinkMap, child: CapKey) -> Option<CapKey> {

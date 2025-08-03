@@ -5,9 +5,9 @@ use crate::{
         back_link_condition, child_link_condition, clean_links, next_link_condition, SysState,
     },
     tcb::{
-        child_of, connection_condition, get_parent, map_connected, sibling_of, siblings,
-        transitive_child_of, view, weak_child_connected, weak_child_link_condition,
-        weak_next_connected, weak_next_link_condition, CapKey, CapMap, LinkMap,
+        child_of, connection_condition, decreasing_condition, get_parent, map_connected,
+        sibling_of, siblings, transitive_child_of, view, weak_child_connected,
+        weak_child_link_condition, weak_next_connected, CapKey, CapMap, LinkMap, Next
     },
 };
 
@@ -27,7 +27,7 @@ pub proof fn lemma_siblings_contained(map: LinkMap, link: Option<CapKey>, key: C
 
         if current != key {
             assert(siblings(map, map[current].next).contains(key));
-            assert(weak_next_link_condition(map, current));
+            assert(decreasing_condition::<Next>(map, current));
             lemma_siblings_contained(map, map[current].next, key);
         }
     }
@@ -47,7 +47,7 @@ pub proof fn lemma_siblings_unfold(map: LinkMap, key: CapKey)
     ensures
         siblings(map, Some(key)) == siblings(map, map[key].next).push(key),
 {
-    assert(weak_next_link_condition(map, key));
+    assert(decreasing_condition::<Next>(map, key));
 }
 
 pub proof fn lemma_siblings_take_n(map: LinkMap, key: CapKey, n: int)
@@ -69,7 +69,7 @@ pub proof fn lemma_siblings_take_n(map: LinkMap, key: CapKey, n: int)
         let pred = siblings(map, Some(key))[n + 1];
         assert(siblings(map, Some(key)).take(n + 1) == siblings(map, Some(pred)).drop_last());
         lemma_siblings_unfold(map, pred);
-        assert(weak_next_link_condition(map, pred));
+        assert(decreasing_condition::<Next>(map, pred));
         lemma_siblings_unfold(map, map[pred].next.unwrap());
         assert(siblings(map, Some(pred)).drop_last().last() == map[pred].next.unwrap());
         assert(siblings(map, Some(key)).take(n + 1) == siblings(map, map[pred].next))
@@ -91,8 +91,8 @@ pub proof fn lemma_siblings_unchanged(map_a: LinkMap, map_b: LinkMap, key: CapKe
     lemma_siblings_unfold(map_b, key);
 
     if let Some(next) = map_a[key].next {
-        assert(weak_next_link_condition(map_a, key));
-        assert(weak_next_link_condition(map_b, key));
+        assert(decreasing_condition::<Next>(map_a, key));
+        assert(decreasing_condition::<Next>(map_b, key));
         lemma_siblings_unchanged(map_a, map_b, next);
     } else {
         lemma_siblings_none_empty(map_a);
@@ -115,13 +115,13 @@ pub proof fn lemma_siblings_unchanged_after(pre: LinkMap, post: LinkMap, key: Ca
     assert(siblings(pre, Some(key)).last() == key);
     assert(siblings(pre, Some(key)).contains(key));
     assert(post[key].next == pre[key].next);
-    assert(weak_next_link_condition(post, key));
+    assert(decreasing_condition::<Next>(post, key));
 
     if let Some(next) = pre[key].next {
-        assert(weak_next_link_condition(pre, key));
+        assert(decreasing_condition::<Next>(pre, key));
         lemma_siblings_unfold(pre, next);
         lemma_siblings_unfold(post, next);
-        assert(weak_next_link_condition(pre, next));
+        assert(decreasing_condition::<Next>(pre, next));
 
         assert forall|sib: CapKey| #[trigger]
             siblings(pre, Some(next)).contains(sib) implies pre[sib].next == post[sib].next by {
@@ -160,7 +160,7 @@ pub proof fn lemma_siblings_decreasing(map: LinkMap, key: CapKey, sib: CapKey)
     decreases map[key].index,
 {
     if let Some(next) = map[key].next {
-        assert(weak_next_link_condition(map, key));
+        assert(decreasing_condition::<Next>(map, key));
         lemma_siblings_unfold(map, key);
         lemma_siblings_unfold(map, next);
 
@@ -316,7 +316,7 @@ pub proof fn lemma_siblings_depth(map: LinkMap, a: CapKey, b: CapKey)
     if a == b {
     } else {
         if let Some(next) = map[a].next {
-            assert(weak_next_link_condition(map, a));
+            assert(decreasing_condition::<Next>(map, a));
             lemma_siblings_depth(map, next, b);
         } else {
             lemma_siblings_none_empty(map);
@@ -458,7 +458,7 @@ pub proof fn lemma_siblings_unchanged_local(
 
     if let Some(next) = pre[key].next {
         lemma_sibling_of_next(pre, key);
-        assert(weak_next_link_condition(post, key));
+        assert(decreasing_condition::<Next>(post, key));
 
         lemma_siblings_unchanged_local(pre, post, changed, next);
         assert(siblings(pre, Some(key)) == siblings(post, Some(key)));

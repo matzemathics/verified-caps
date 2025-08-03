@@ -3,8 +3,8 @@ use vstd::prelude::*;
 use crate::{
     lemmas::{lemma_siblings_none_empty, lemma_siblings_unchanged, lemma_siblings_unfold},
     tcb::{
-        insert_child, next_index, siblings, view, weak_child_connected, weak_child_link_condition,
-        weak_next_connected, weak_next_link_condition, CapKey, CapNode, LinkMap, LinkedNode,
+        decreasing_condition, insert_child, next_index, siblings, view, weak_child_connected,
+        weak_child_link_condition, weak_next_connected, CapKey, CapNode, LinkMap, LinkedNode, Next,
     },
 };
 
@@ -15,7 +15,7 @@ pub proof fn lemma_insert_siblings_unchanged(map: LinkMap, new: (CapKey, LinkedN
         !map.contains_key(new.0),
         map.contains_key(key),
         weak_next_connected(map),
-        weak_next_link_condition(map.insert(new.0, new.1), new.0),
+        decreasing_condition::<Next>(map.insert(new.0, new.1), new.0),
     ensures
         siblings(map, Some(key)) == siblings(map.insert(new.0, new.1), Some(key)),
     decreases map[key].index,
@@ -23,20 +23,20 @@ pub proof fn lemma_insert_siblings_unchanged(map: LinkMap, new: (CapKey, LinkedN
     assert(map[key] == map.insert(new.0, new.1)[key]);
 
     assert forall|key: CapKey|
-        map.insert(new.0, new.1).contains_key(key) implies #[trigger] weak_next_link_condition(
+        map.insert(new.0, new.1).contains_key(key) implies #[trigger] decreasing_condition::<Next>(
         map.insert(new.0, new.1),
         key,
     ) by {
         if key == new.0 {
         } else {
-            assert(weak_next_link_condition(map, key));
+            assert(decreasing_condition::<Next>(map, key));
         }
     };
 
     assert(weak_next_connected(map.insert(new.0, new.1)));
 
     if let Some(next) = map[key].next {
-        assert(weak_next_link_condition(map, key));
+        assert(decreasing_condition::<Next>(map, key));
         lemma_insert_siblings_unchanged(map, new, next);
         assert(siblings(map, Some(key)) == siblings(map.insert(new.0, new.1), Some(key)));
     } else {
@@ -114,7 +114,7 @@ impl OpInsertChild {
         lemma_siblings_none_empty(map);
         lemma_siblings_none_empty(self.child_update(map));
 
-        assert(weak_next_link_condition(self.child_update(map), self.child)) by {
+        assert(decreasing_condition::<Next>(self.child_update(map), self.child)) by {
             if map[self.parent].child.is_none() {
                 assert(self.child_update(map)[self.child].next.is_none());
             } else {
@@ -199,15 +199,15 @@ impl OpInsertChild {
             weak_next_connected(self.child_update(map)),
     {
         assert forall|key: CapKey|
-            self.child_update(map).contains_key(key) implies #[trigger] weak_next_link_condition(
+            self.child_update(map).contains_key(key) implies #[trigger] decreasing_condition::<Next>(
             self.child_update(map),
             key,
         ) by {
             if key == self.child {
                 assert(weak_child_link_condition(map, self.parent));
-                assert(weak_next_link_condition(self.child_update(map), self.child));
+                assert(decreasing_condition::<Next>(self.child_update(map), self.child));
             } else {
-                assert(weak_next_link_condition(map, key));
+                assert(decreasing_condition::<Next>(map, key));
             }
         };
     }
@@ -238,11 +238,11 @@ impl OpInsertChild {
             self.invariants(self.next_update(map)),
     {
         assert forall|key: CapKey| #[trigger] self.next_update(map).contains_key(key) implies {
-            &&& weak_next_link_condition(self.next_update(map), key)
+            &&& decreasing_condition::<Next>(self.next_update(map), key)
             &&& weak_child_link_condition(self.next_update(map), key)
         } by {
             assert(weak_child_link_condition(map, self.parent));
-            assert(weak_next_link_condition(map, key));
+            assert(decreasing_condition::<Next>(map, key));
             assert(weak_child_link_condition(map, key));
         };
     }
@@ -256,10 +256,10 @@ impl OpInsertChild {
             self.invariants(self.parent_update(map)),
     {
         assert forall|key: CapKey| #[trigger] self.parent_update(map).contains_key(key) implies {
-            &&& weak_next_link_condition(self.parent_update(map), key)
+            &&& decreasing_condition::<Next>(self.parent_update(map), key)
             &&& weak_child_link_condition(self.parent_update(map), key)
         } by {
-            assert(weak_next_link_condition(map, key));
+            assert(decreasing_condition::<Next>(map, key));
 
             if key == self.parent {
                 assert(weak_child_link_condition(self.parent_update(map), self.parent));
