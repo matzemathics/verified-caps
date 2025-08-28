@@ -590,7 +590,7 @@ pub proof fn lemma_depth_increase(map: CapMap, parent: CapKey, child: CapKey)
 requires
     map.contains_key(parent),
     map.contains_key(child),
-    map[parent].children.contains(child),
+    child_of(map, child, parent),
     acyclic(map),
     tree_ish(map)
 ensures
@@ -625,6 +625,58 @@ pub proof fn lemma_transitive_children_empty(map: CapMap, parent: CapKey, child:
 
         lemma_depth_increase(map, intermediate, child);
         lemma_transitive_children_empty(map, parent, intermediate);
+    }
+}
+
+pub proof fn lemma_transitive_child_parent(map: CapMap, top: CapKey, parent: CapKey, child: CapKey)
+requires
+    acyclic(map),
+    tree_ish(map),
+    map.contains_key(child),
+    map.contains_key(parent),
+    map.contains_key(top),
+    transitive_child_of(map, child, top),
+    child_of(map, child, parent),
+    top != child,
+ensures
+    transitive_child_of(map, parent, top)
+{
+    assert(transitive_child_of(map, child, top));
+    let other = choose |node: CapKey| {
+        &&& map.contains_key(node)
+        &&& #[trigger] map[node].children.contains(child)
+        &&& transitive_child_of(map, node, top)
+    };
+
+    lemma_is_parent_of(map, parent, child);
+    lemma_is_parent_of(map, other, child);
+}
+
+pub proof fn lemma_transitive_child_extend(map: CapMap, top: CapKey, parent: CapKey, child: CapKey)
+requires
+    acyclic(map),
+    tree_ish(map),
+    child_of(map, parent, top),
+    transitive_child_of(map, child, parent),
+    map.contains_key(top),
+    map.contains_key(child),
+ensures
+    transitive_child_of(map, child, top)
+decreases
+    depth(map, child)
+{
+    if child == parent {
+        assert(transitive_child_of(map, top, top));
+    }
+    else {
+        let other = choose |node: CapKey| {
+            &&& map.contains_key(node)
+            &&& #[trigger] map[node].children.contains(child)
+            &&& transitive_child_of(map, node, parent)
+        };
+
+        lemma_depth_increase(map, other, child);
+        lemma_transitive_child_extend(map, top, parent, other);
     }
 }
 

@@ -7,13 +7,14 @@ use crate::{
         lemma_seq_remove_value_contains_b, lemma_sib_back_some, lemma_sibling_of_next,
         lemma_siblings_contained, lemma_siblings_decreasing, lemma_siblings_no_loop,
         lemma_siblings_none_empty, lemma_siblings_unchanged_after, lemma_siblings_unchanged_local,
-        lemma_siblings_unfold, lemma_view_acyclic, lemma_view_tree_ish,
+        lemma_siblings_unfold, lemma_transitive_child_extend, lemma_view_acyclic,
+        lemma_view_tree_ish,
     },
     state::{back_link_condition, clean_links, SysState},
     tcb::{
         acyclic, child_of, decreasing, decreasing_condition, depth, depth_fn, depth_fn_condition,
         get_parent, revoke_single_parent_update, sibling_of, siblings, transitive_child_of,
-        transitive_children, view, CapKey, Child, LinkMap, Next,
+        transitive_children, tree_ish, view, CapKey, CapMap, Child, LinkMap, Next,
     },
 };
 
@@ -479,6 +480,49 @@ pub proof fn lemma_revoke_transitive_non_changes(
     assert(view(pre).remove_keys(subtree) =~= revoke_single_parent_update(view(pre), removed).remove(
             removed,
         ).remove_keys(subtree));
+}
+
+pub proof fn lemma_still_transitive_child(pre: CapMap, top: CapKey, intermediate: CapKey, removed: CapKey)
+requires
+    acyclic(pre),
+    acyclic(revoke_single_parent_update(pre, removed).remove(removed)),
+    tree_ish(pre),
+    transitive_child_of(pre, intermediate, top),
+    transitive_child_of(pre, removed, intermediate),
+    pre.contains_key(intermediate),
+    pre.contains_key(removed),
+    depth(pre, intermediate) < depth(pre, removed),
+ensures
+    transitive_child_of(revoke_single_parent_update(pre, removed).remove(removed), intermediate, top)
+decreases
+    depth(pre, intermediate)
+{
+    let post = revoke_single_parent_update(pre, removed).remove(removed);
+
+    if intermediate == top {}
+    else {
+        let other = choose |node: CapKey| {
+            &&& pre.contains_key(node)
+            &&& #[trigger] pre[node].children.contains(intermediate)
+            &&& transitive_child_of(pre, node, top)
+        };
+
+        lemma_transitive_child_extend(pre, other, intermediate, removed);
+        assert(transitive_child_of(pre, removed, other));
+
+        lemma_depth_increase(pre, other, intermediate);
+        lemma_still_transitive_child(pre, top, other, removed);
+
+        assert(!child_of(pre, removed, other)) by {
+            assert(depth(pre, other) < depth(pre, intermediate));
+            if child_of(pre, removed, other) {
+                lemma_depth_increase(pre, other, removed);
+                assert(depth(pre, intermediate) >= depth(pre, removed));
+            }
+        }
+
+        assert(child_of(post, intermediate, other));
+    }
 }
 
 } // verus!

@@ -7,11 +7,13 @@ use vstd::{
 use crate::{
     insert_view::OpInsertChild,
     lemmas::{
-        lemma_siblings_none_empty, lemma_siblings_unfold, lemma_transitive_children_empty,
-        lemma_view_well_formed,
+        lemma_depth_increase, lemma_siblings_none_empty, lemma_siblings_unfold,
+        lemma_transitive_child_parent, lemma_transitive_children_empty, lemma_view_acyclic,
+        lemma_view_tree_ish,
     },
     revoke_view::{
         lemma_revoke_spec, lemma_revoke_transitive_changes, lemma_revoke_transitive_non_changes,
+        lemma_still_transitive_child,
     },
     state::{LinkSystem, SysState, Token},
     tables::{HashMetaCapTable, MetaCapTable},
@@ -201,7 +203,7 @@ impl Meta {
         ensures
             self.wf(),
             self.spec().dom() == old(self).spec().dom().remove(key),
-            view(self.spec()) == revoke_single_parent_update(old(self).spec(), key).remove(key),
+            view(self.spec()) == revoke_single_parent_update(view(old(self).spec()), key).remove(key),
     {
         let tracked _ = self.instance.borrow().clean_links(self.spec.borrow(), self.state.borrow());
         let tracked token = self.instance.borrow_mut().revoke_single(
@@ -297,7 +299,7 @@ impl Meta {
         broadcast use vstd::set::group_set_axioms;
 
         let tracked _ = self.instance.borrow().weak_connections(self.spec.borrow());
-        let tracked _ = lemma_view_well_formed(self.spec());
+        let tracked _ = lemma_view_acyclic(self.spec());
         assert(transitive_child_of(view(self.spec()), key, key));
         let ghost subtree = transitive_children(view(self.spec()), key);
         let ghost revoked_keys = Set::<CapKey>::empty();
@@ -329,12 +331,12 @@ impl Meta {
             }
 
             let tracked _ = self.instance.borrow().weak_connections(self.spec.borrow());
-            let tracked _ = lemma_view_well_formed(self.spec());
+            let tracked _ = lemma_view_acyclic(self.spec());
             let tracked _ = self.instance.borrow().clean_links(self.spec.borrow(), self.state.borrow());
             let ghost pre = self.spec();
             self.revoke_single(child.key);
             let tracked _ = self.instance.borrow().weak_connections(self.spec.borrow());
-            let tracked _ = lemma_view_well_formed(self.spec());
+            let tracked _ = lemma_view_acyclic(self.spec());
             let tracked _ = lemma_revoke_transitive_changes(pre, child.key, key);
             let tracked _ = lemma_revoke_transitive_non_changes(
                 pre,
@@ -350,19 +352,29 @@ impl Meta {
                 assert(subtree == transitive_children(view(self.spec()), key).union(revoked_keys));
                 assert(subtree.contains(child.key));
 
-                if let Some(parent) = get_parent(self.spec(), child.key) {
-                    assume(transitive_child_of(view(self.spec()), parent, key));
+                if let Some(parent) = get_parent(view(self.spec()), child.key) {
+                    assert(transitive_child_of(view(pre), child.key, key));
+                    lemma_view_tree_ish(pre);
+                    lemma_transitive_child_parent(view(pre), key, parent, child.key);
+                    lemma_depth_increase(view(pre), parent, child.key);
+                    assert(transitive_child_of(view(pre), parent, parent));
+                    lemma_still_transitive_child(view(pre), key, parent, child.key);
+                    assert(transitive_child_of(view(self.spec()), parent, key));
                 }
 
                 assert(view(old(self).spec()).remove_keys(subtree) == view(self.spec()).remove_keys(subtree));
             };
         }
 
-        let tracked _ = self.instance.borrow().weak_connections(self.spec.borrow());
-        let tracked _ = lemma_view_well_formed(self.spec());
+        let tracked _ = self.instance.borrow().clean_links(self.spec.borrow(), self.state.borrow());
+        let tracked _ = lemma_view_acyclic(self.spec());
+        let tracked _ = lemma_view_tree_ish(self.spec());
 
-        assert forall|child: CapKey|
-            transitive_child_of(view(self.spec()), child, key) implies child == key by {
+        assert forall |child: CapKey| {
+            &&& self.contains_key(child)
+            &&& #[trigger] transitive_child_of(view(self.spec()), child, key)
+        }
+        implies child == key by {
             lemma_transitive_children_empty(view(self.spec()), key, child)
         };
 
@@ -430,7 +442,7 @@ impl Meta {
     {
         let mut res = self.borrow_node(parent);
         let tracked _ = self.instance.borrow().weak_connections(self.spec.borrow());
-        let tracked _ = lemma_view_well_formed(self.spec());
+        let tracked _ = lemma_view_acyclic(self.spec());
         assert(transitive_child_of(view(self.spec()), res.key, parent));
 
         while res.child != 0
@@ -456,7 +468,7 @@ impl Meta {
                 assert(view(self.spec())[res.key].children.contains(next));
                 self.instance.borrow().depth_bound(next, self.spec.borrow(), self.generation.borrow());
 
-                lemma_view_well_formed(self.spec());
+                lemma_view_acyclic(self.spec());
                 assert(transitive_child_of(view(self.spec()), next, parent));
                 self.instance.borrow().token_invariant(next, self.spec.borrow(), self.tokens.borrow());
                 self.instance.borrow().borrow_token(

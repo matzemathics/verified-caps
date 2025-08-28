@@ -18,7 +18,7 @@ use vstd::prelude::*;
 mod cell_map;
 mod insert_view;
 mod lemmas;
-// mod meta;
+mod meta;
 mod nullable;
 mod ptr_map;
 mod revoke_view;
