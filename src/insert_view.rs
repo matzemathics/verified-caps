@@ -67,7 +67,7 @@ impl OpInsertChild {
     }
 
     pub open spec fn insert_view_node(&self, map: LinkMap) -> CapNode {
-        CapNode { generation: map[self.parent].depth + 1, children: Seq::empty() }
+        CapNode { children: Seq::empty() }
     }
 
     pub open spec fn child_update(&self, map: LinkMap) -> LinkMap {
@@ -309,9 +309,9 @@ impl OpInsertChild {
         };
 
         assert(decreasing_condition::<Child>(self.update(map), self.parent));
-        let CapNode { generation, children } = view(map)[self.parent];
-        let parent_node = CapNode { generation, children: children.push(self.child) };
-        let child_node = CapNode { generation: generation + 1, children: Seq::empty() };
+        let CapNode { children } = view(map)[self.parent];
+        let parent_node = CapNode { children: children.push(self.child) };
+        let child_node = CapNode { children: Seq::empty() };
         assert(view(self.update(map))[self.parent] == parent_node);
 
         assert(view(checkpoint) == view(map).insert(self.child, child_node));
