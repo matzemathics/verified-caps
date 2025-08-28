@@ -330,22 +330,21 @@ impl Meta {
                 break
             }
 
-            let tracked _ = self.instance.borrow().weak_connections(self.spec.borrow());
-            let tracked _ = lemma_view_acyclic(self.spec());
-            let tracked _ = self.instance.borrow().clean_links(self.spec.borrow(), self.state.borrow());
+            let tracked _ = {
+                self.instance.borrow().weak_connections(self.spec.borrow());
+                lemma_view_acyclic(self.spec());
+                self.instance.borrow().clean_links(self.spec.borrow(), self.state.borrow());
+            };
+
             let ghost pre = self.spec();
             self.revoke_single(child.key);
-            let tracked _ = self.instance.borrow().weak_connections(self.spec.borrow());
-            let tracked _ = lemma_view_acyclic(self.spec());
-            let tracked _ = lemma_revoke_transitive_changes(pre, child.key, key);
-            let tracked _ = lemma_revoke_transitive_non_changes(
-                pre,
-                child.key,
-                key,
-                subtree,
-            );
 
-            proof! {
+            let tracked _ = {
+                self.instance.borrow().weak_connections(self.spec.borrow());
+                lemma_view_acyclic(self.spec());
+                lemma_revoke_transitive_changes(pre, child.key, key);
+                lemma_revoke_transitive_non_changes(pre, child.key, key, subtree);
+
                 revoked_keys = revoked_keys.insert(child.key);
                 assert(old(self).dom() == self.dom().union(revoked_keys));
 
