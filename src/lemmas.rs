@@ -1,13 +1,13 @@
-use vstd::prelude::*;
+use vstd::{prelude::*, set_lib::lemma_len_subset};
 
 use crate::{
     state::{
         back_link_condition, child_link_condition, clean_links, next_link_condition, SysState,
     },
     tcb::{
-        child_of, connection_condition, decreasing, decreasing_condition, get_parent,
-        map_connected, sibling_of, siblings, transitive_child_of, view, CapKey, CapMap, Child,
-        LinkMap, Next,
+        acyclic, child_of, decreasing, decreasing_condition, depth, depth_fn, depth_fn_condition,
+        get_parent, parents, sibling_of, siblings, transitive_child_of, tree_ish, view, CapKey,
+        CapMap, Child, LinkMap, Next,
     },
 };
 
@@ -295,7 +295,7 @@ pub proof fn lemma_child_of_first_child(map: LinkMap, parent: CapKey)
         map.contains_key(parent),
         map[parent].child.is_some(),
     ensures
-        child_of(map, map[parent].child.unwrap(), parent),
+        child_of(view(map), map[parent].child.unwrap(), parent),
 {
     assert(decreasing_condition::<Child>(map, parent));
     lemma_siblings_unfold(map, map[parent].child.unwrap());
@@ -326,7 +326,7 @@ pub proof fn lemma_siblings_depth(map: LinkMap, a: CapKey, b: CapKey)
 
 pub proof fn lemma_child_of_depth(map: LinkMap, child: CapKey, parent: CapKey)
     requires
-        child_of(map, child, parent),
+        child_of(view(map), child, parent),
         decreasing::<Child>(map),
         decreasing::<Next>(map),
         map.contains_key(parent),
@@ -349,8 +349,8 @@ pub proof fn lemma_child_of_univalent(
 )
     requires
         clean_links(map),
-        child_of(map, child, parent_a),
-        child_of(map, child, parent_b),
+        child_of(view(map), child, parent_a),
+        child_of(view(map), child, parent_b),
         map.contains_key(parent_a),
         map.contains_key(parent_b),
     ensures
@@ -381,6 +381,27 @@ pub proof fn lemma_child_of_univalent(
     }
 }
 
+pub proof fn lemma_view_tree_ish(map: LinkMap)
+requires clean_links(map)
+ensures tree_ish(view(map))
+{
+    assert forall |child: CapKey| #[trigger] map.contains_key(child)
+    implies parents(view(map), child).finite() && parents(view(map), child).len() <= 1
+    by {
+        if let Some(parent) = get_parent(view(map), child) {
+            assert forall |other: CapKey| parents(view(map), child).contains(other)
+            implies other == parent
+            by { lemma_child_of_univalent(map, parent, other, child); }
+
+            assert(parents(view(map), child).subset_of(set![parent]));
+            lemma_len_subset(parents(view(map), child), set![parent]);
+        }
+        else {
+            assert(parents(view(map), child).is_empty());
+        }
+    }
+}
+
 pub proof fn lemma_parent_child(map: LinkMap, parent: CapKey, child: CapKey)
     requires
         map.contains_key(parent),
@@ -391,10 +412,10 @@ pub proof fn lemma_parent_child(map: LinkMap, parent: CapKey, child: CapKey)
                 &&& child_link_condition(SysState::Clean, map, key)
             },
     ensures
-        child_of(map, child, parent) <==> get_parent(map, child) == Some(parent),
+        child_of(view(map), child, parent) <==> get_parent(view(map), child) == Some(parent),
 {
-    if let Some(alt_parent) = get_parent(map, child) {
-        if child_of(map, child, parent) {
+    if let Some(alt_parent) = get_parent(view(map), child) {
+        if child_of(view(map), child, parent) {
             lemma_child_of_univalent(map, alt_parent, parent, child);
         }
     }
@@ -406,22 +427,22 @@ pub proof fn lemma_sibling_of_next(map: LinkMap, key: CapKey)
         map.contains_key(key),
         map[key].next.is_some(),
     ensures
-        sibling_of(map, key, map[key].next.unwrap()),
+        sibling_of(view(map), key, map[key].next.unwrap()),
 {
     let next = map[key].next.unwrap();
     lemma_siblings_unfold(map, key);
     assert(ith_predecessor(map, key, 1, next));
 
-    if let Some(parent) = get_parent(map, key) {
-        assert(child_of(map, key, parent));
+    if let Some(parent) = get_parent(view(map), key) {
+        assert(child_of(view(map), key, parent));
         let child = map[parent].child.unwrap();
         let index = siblings(map, Some(child)).index_of(key);
 
         lemma_siblings_take_n(map, child, index);
-        assert(child_of(map, next, parent));
+        assert(child_of(view(map), next, parent));
 
-        lemma_child_of_univalent(map, parent, get_parent(map, next).unwrap(), next);
-    } else if let Some(alt_parent) = get_parent(map, next) {
+        lemma_child_of_univalent(map, parent, get_parent(view(map), next).unwrap(), next);
+    } else if let Some(alt_parent) = get_parent(view(map), next) {
         let child = map[alt_parent].child.unwrap();
         let index = siblings(map, Some(child)).index_of(next);
 
@@ -440,10 +461,10 @@ pub proof fn lemma_siblings_unchanged_local(
 )
     requires
         forall|key: CapKey|
-            #![trigger sibling_of(pre, changed, key)]
-            pre.contains_key(key) && !sibling_of(pre, changed, key) ==> pre[key].next
-                == post[key].next,
-        !sibling_of(pre, changed, key),
+            #![trigger sibling_of(view(pre), changed, key)]
+            pre.contains_key(key) && !sibling_of(view(pre), changed, key) ==>
+                pre[key].next == post[key].next,
+        !sibling_of(view(pre), changed, key),
         pre.contains_key(key),
         post.contains_key(key),
         decreasing::<Next>(post),
@@ -491,32 +512,72 @@ pub proof fn lemma_sib_back_some(map: LinkMap, start: CapKey, child: CapKey)
     }
 }
 
-pub proof fn lemma_view_well_formed(map: LinkMap)
+pub proof fn lemma_view_acyclic(map: LinkMap)
     requires
         decreasing::<Next>(map),
         decreasing::<Child>(map),
     ensures
-        map_connected(view(map)),
+        acyclic(view(map))
 {
-    assert forall|parent: CapKey, child: CapKey| connection_condition(view(map), child, parent) by {
-        if view(map).contains_key(parent) && view(map)[parent].children.contains(child) {
-            assert(child_of(map, child, parent));
+    let d = |key| map[key].depth;
+    assert forall|key: CapKey| #[trigger] depth_fn_condition(d, view(map), key) by {
+        if let Some(parent) = get_parent(view(map), key) {
             assert(decreasing_condition::<Child>(map, parent));
-            lemma_child_of_depth(map, child, parent);
-            lemma_siblings_contained(map, map[parent].child, child);
+            lemma_child_of_depth(map, key, parent);
+            lemma_siblings_contained(map, map[parent].child, key);
         }
+        else { }
     }
+
+    assert(depth_fn(d, view(map)));
+}
+
+proof fn lemma_is_parent_of(map: CapMap, parent: CapKey, child: CapKey)
+requires
+    map.contains_key(parent),
+    map.contains_key(child),
+    map[parent].children.contains(child),
+    tree_ish(map)
+ensures
+    get_parent(map, child) == Some(parent)
+{
+    if let Some(other) = get_parent(map, child) {
+        assert(parents(map, child).len() <= 1);
+        lemma_len_subset(set![other, parent], parents(map, child));
+        assert(other == parent);
+    }
+    else {
+        assert(child_of(map, child, parent));
+    }
+}
+
+pub proof fn lemma_depth_increase(map: CapMap, parent: CapKey, child: CapKey)
+requires
+    map.contains_key(parent),
+    map.contains_key(child),
+    map[parent].children.contains(child),
+    acyclic(map),
+    tree_ish(map)
+ensures
+    depth(map, child) == depth(map, parent) + 1
+{
+    let g = choose |f: spec_fn(CapKey) -> nat| depth_fn(f, map);
+    lemma_is_parent_of(map, parent, child);
+    assert(depth_fn_condition(g, map, child));
+    assert(g(child) == g(parent) + 1);
 }
 
 pub proof fn lemma_transitive_children_empty(map: CapMap, parent: CapKey, child: CapKey)
     requires
         map.contains_key(parent),
-        map_connected(map),
+        map.contains_key(child),
+        acyclic(map),
+        tree_ish(map),
         transitive_child_of(map, child, parent),
         map[parent].children.len() == 0,
     ensures
         child == parent,
-    decreases map[child].generation,
+    decreases depth(map, child),
 {
     if child != parent {
         let intermediate = choose|key: CapKey|
@@ -526,7 +587,8 @@ pub proof fn lemma_transitive_children_empty(map: CapMap, parent: CapKey, child:
                 &&& transitive_child_of(map, key, parent)
             };
 
-        assert(connection_condition(map, child, intermediate));
+
+        lemma_depth_increase(map, intermediate, child);
         lemma_transitive_children_empty(map, parent, intermediate);
     }
 }
