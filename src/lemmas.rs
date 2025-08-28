@@ -324,6 +324,41 @@ pub proof fn lemma_siblings_depth(map: LinkMap, a: CapKey, b: CapKey)
     }
 }
 
+pub proof fn lemma_seq_remove_value_contains_a<A>(seq: Seq<A>, removed: A, elem: A)
+requires seq.remove_value(removed).contains(elem)
+ensures seq.contains(elem)
+{
+    let index = seq.remove_value(removed).index_of(elem);
+
+    if let Some(removed_index) = seq.index_of_first(removed) {
+        seq.index_of_first_ensures(removed);
+        seq.remove_ensures(removed_index);
+    }
+}
+
+pub proof fn lemma_seq_remove_value_contains_b<A>(seq: Seq<A>, removed: A, elem: A)
+    requires
+        seq.contains(elem),
+        removed != elem
+    ensures
+        seq.remove_value(removed).contains(elem)
+{
+    if let Some(index) = seq.index_of_first(removed) {
+        seq.index_of_first_ensures(removed);
+        seq.remove_ensures(index);
+
+        let elem_index = choose |i: int| 0 <= i < seq.len() && seq[i] == elem;
+
+        if elem_index < index {
+            assert(seq.remove_value(removed)[elem_index] == elem);
+        }
+        else if elem_index == index {}
+        else {
+            assert(seq.remove_value(removed)[elem_index - 1] == elem);
+        }
+    }
+}
+
 pub proof fn lemma_child_of_depth(map: LinkMap, child: CapKey, parent: CapKey)
     requires
         child_of(view(map), child, parent),

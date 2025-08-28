@@ -21,7 +21,7 @@ mod lemmas;
 // mod meta;
 mod nullable;
 mod ptr_map;
-// mod revoke_view;
+mod revoke_view;
 mod state;
 mod tables;
 mod tcb;
