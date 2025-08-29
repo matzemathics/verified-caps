@@ -74,9 +74,10 @@ impl Meta {
         &&& self.table.wf()
         &&& self.state@.value() == SysState::Clean
         &&& self.dom() == self.table@.dom()
-        &&& forall|key: CapKey| #[trigger]
-            self.table@.contains_key(key) ==> self.tokens@.value()[key].addr()
-                == self.table@[key].addr() && self.get(key).key == key
+        &&& forall|key: CapKey| self.table@.contains_key(key) ==> {
+            &&& #[trigger] self.tokens@.value()[key].addr() == self.table@[key].addr()
+            &&& self.get(key).key == key
+        }
     }
 
     fn insert_root(&mut self, key: CapKey)
@@ -283,6 +284,17 @@ impl Meta {
         let tracked _ = lemma_revoke_spec(old(self).spec(), self.spec(), key);
 
         assert(self.spec().dom() == self.table@.dom());
+
+        let tracked _ = {
+            assert forall|key: CapKey| #[trigger] self.table@.contains_key(key)
+            implies {
+                &&& self.tokens@.value()[key].addr() == self.table@[key].addr()
+                &&& self.get(key).key == key
+            }
+            by {
+                assert(self.tokens@.value()[key].addr() == self.table@[key].addr());
+            };
+        };
     }
 
     fn revoke_children(&mut self, key: CapKey)
@@ -397,6 +409,8 @@ impl Meta {
             self.contains_key(key),
         ensures
             self.get(key) == res,
+            self.contains(res),
+            res.key == key,
     {
         let ptr = self.table.get(key).unwrap();
         let tracked borrow = self.instance.borrow().borrow_token(
