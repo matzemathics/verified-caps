@@ -1,7 +1,10 @@
 use state_machines_macros::tokenized_state_machine;
 use vstd::prelude::*;
 
-use crate::tcb::{decreasing, next_index, CapKey, Child, LinkMap, LinkedNode, Next};
+use crate::specs::{
+    cap_map::CapKey,
+    link_map::{decreasing, next_index, Child, LinkMap, LinkedNode, Next},
+};
 
 verus! {
 

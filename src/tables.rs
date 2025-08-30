@@ -1,9 +1,9 @@
 use vstd::{prelude::*, std_specs::hash::*};
 
-use crate::{
-    cell_map::MutMap,
-    tcb::{ActId, CapId, CapKey},
-};
+use crate::specs::cap_map::{ActId, CapId, CapKey};
+
+mod cell_map;
+use cell_map::MutMap;
 
 use std::collections::HashMap;
 

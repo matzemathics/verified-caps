@@ -1,10 +1,11 @@
 use vstd::prelude::*;
 
+use super::common::{lemma_siblings_none_empty, lemma_siblings_unchanged, lemma_siblings_unfold};
 use crate::{
-    lemmas::{lemma_siblings_none_empty, lemma_siblings_unchanged, lemma_siblings_unfold},
-    tcb::{
-        decreasing, decreasing_condition, insert_child, next_index, siblings, view, CapKey,
-        CapNode, Child, LinkMap, LinkedNode, Next,
+    specs::cap_map::{insert_child, CapKey, CapNode},
+    specs::link_map::{
+        decreasing, decreasing_condition, next_index, siblings, view, Child, LinkMap, LinkedNode,
+        Next,
     },
 };
 

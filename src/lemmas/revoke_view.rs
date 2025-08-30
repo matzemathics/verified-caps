@@ -1,21 +1,21 @@
 use vstd::prelude::*;
 
+use super::common::{
+    lemma_child_of_depth, lemma_child_of_first_child, lemma_child_of_univalent,
+    lemma_depth_increase, lemma_parent_child, lemma_seq_remove_value_contains_a,
+    lemma_seq_remove_value_contains_b, lemma_sib_back_some, lemma_sibling_of_next,
+    lemma_siblings_contained, lemma_siblings_decreasing, lemma_siblings_no_loop,
+    lemma_siblings_none_empty, lemma_siblings_unchanged_after, lemma_siblings_unchanged_local,
+    lemma_siblings_unfold, lemma_transitive_child_extend, lemma_view_acyclic, lemma_view_tree_ish,
+};
 use crate::{
-    lemmas::{
-        lemma_child_of_depth, lemma_child_of_first_child, lemma_child_of_univalent,
-        lemma_depth_increase, lemma_parent_child, lemma_seq_remove_value_contains_a,
-        lemma_seq_remove_value_contains_b, lemma_sib_back_some, lemma_sibling_of_next,
-        lemma_siblings_contained, lemma_siblings_decreasing, lemma_siblings_no_loop,
-        lemma_siblings_none_empty, lemma_siblings_unchanged_after, lemma_siblings_unchanged_local,
-        lemma_siblings_unfold, lemma_transitive_child_extend, lemma_view_acyclic,
-        lemma_view_tree_ish,
+    specs::cap_map::{
+        acyclic, child_of, depth, depth_fn, depth_fn_condition, get_parent,
+        revoke_single_parent_update, sibling_of, transitive_child_of, transitive_children,
+        tree_ish, CapKey, CapMap,
     },
+    specs::link_map::{decreasing, decreasing_condition, siblings, view, Child, LinkMap, Next},
     state::{back_link_condition, clean_links, SysState},
-    tcb::{
-        acyclic, child_of, decreasing, decreasing_condition, depth, depth_fn, depth_fn_condition,
-        get_parent, revoke_single_parent_update, sibling_of, siblings, transitive_child_of,
-        transitive_children, tree_ish, view, CapKey, CapMap, Child, LinkMap, Next,
-    },
 };
 
 verus! {

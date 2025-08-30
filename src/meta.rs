@@ -5,22 +5,23 @@ use vstd::{
 };
 
 use crate::{
-    insert_view::OpInsertChild,
+    lemmas::insert_view::OpInsertChild,
+    lemmas::revoke_view::{
+        lemma_revoke_spec, lemma_revoke_transitive_changes, lemma_revoke_transitive_non_changes,
+        lemma_still_transitive_child,
+    },
     lemmas::{
         lemma_depth_increase, lemma_siblings_none_empty, lemma_siblings_unfold,
         lemma_transitive_child_parent, lemma_transitive_children_empty, lemma_view_acyclic,
         lemma_view_tree_ish,
     },
-    revoke_view::{
-        lemma_revoke_spec, lemma_revoke_transitive_changes, lemma_revoke_transitive_non_changes,
-        lemma_still_transitive_child,
+    specs::cap_map::{
+        get_parent, revoke_single_parent_update, transitive_child_of, transitive_children, ActId,
+        CapKey,
     },
+    specs::link_map::{decreasing_condition, siblings, view, Child, LinkMap},
     state::{LinkSystem, SysState, Token},
     tables::{HashMetaCapTable, MetaCapTable},
-    tcb::{
-        decreasing_condition, get_parent, revoke_single_parent_update, siblings,
-        transitive_child_of, transitive_children, view, ActId, CapKey, Child, LinkMap,
-    },
 };
 
 verus! {
