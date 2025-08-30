@@ -5,21 +5,23 @@ use vstd::{
 };
 
 use crate::{
-    lemmas::insert_view::OpInsertChild,
-    lemmas::revoke_view::{
-        lemma_revoke_spec, lemma_revoke_transitive_changes, lemma_revoke_transitive_non_changes,
-        lemma_still_transitive_child,
-    },
     lemmas::{
+        insert_view::OpInsertChild,
         lemma_depth_increase, lemma_siblings_none_empty, lemma_siblings_unfold,
         lemma_transitive_child_parent, lemma_transitive_children_empty, lemma_view_acyclic,
         lemma_view_tree_ish,
+        revoke_view::{
+            lemma_revoke_spec, lemma_revoke_transitive_changes,
+            lemma_revoke_transitive_non_changes, lemma_still_transitive_child,
+        },
     },
-    specs::cap_map::{
-        get_parent, revoke_single_parent_update, transitive_child_of, transitive_children, ActId,
-        CapKey,
+    specs::{
+        cap_map::{
+            get_parent, insert_child, revoke_single_parent_update, transitive_child_of,
+            transitive_children, ActId, CapKey, CapMap,
+        },
+        link_map::{decreasing_condition, siblings, view, Child, LinkMap},
     },
-    specs::link_map::{decreasing_condition, siblings, view, Child, LinkMap},
     state::{LinkSystem, SysState, Token},
     tables::{HashMetaCapTable, MetaCapTable},
 };
@@ -69,7 +71,7 @@ impl Meta {
         &&& self.generation@.instance_id() == self.instance@.id()
     }
 
-    spec fn wf(&self) -> bool {
+    pub closed spec fn wf(&self) -> bool {
         &&& self.ties()
         &&& self.dom().finite()
         &&& self.table.wf()
@@ -81,9 +83,13 @@ impl Meta {
         }
     }
 
-    fn insert_root(&mut self, key: CapKey)
+    pub closed spec fn view(&self) -> CapMap {
+        view(self.spec())
+    }
+
+    pub fn insert_root(&mut self, key: CapKey)
         requires
-            !old(self).contains_key(key),
+            !old(self)@.contains_key(key),
             old(self).wf(),
         ensures
             self.wf(),
@@ -103,19 +109,21 @@ impl Meta {
         self.table.insert(key, ptr);
     }
 
-    fn insert_child(&mut self, parent: CapKey, child: CapKey)
+    pub fn insert_child(&mut self, parent: CapKey, child: CapKey)
         requires
-            old(self).contains_key(parent),
-            !old(self).contains_key(child),
+            old(self)@.contains_key(parent),
+            !old(self)@.contains_key(child),
             old(self).wf(),
         ensures
             self.wf(),
-            self.spec() == (OpInsertChild { parent, child }).update(old(self).spec()),
+            self@ == insert_child(old(self)@, parent, child),
     {
         proof!{
             // needed later to show parent.next != child && parent.back != child
             self.instance.borrow().contains_back(parent, self.spec.borrow());
             self.instance.borrow().contains_next(parent, self.spec.borrow());
+
+            self.instance.borrow().weak_connections(self.spec.borrow());
         };
 
         let parent_ptr = *self.table.get(parent).unwrap();
@@ -194,18 +202,26 @@ impl Meta {
             );
 
             assert(self.spec().dom() == self.table@.dom());
+            assert(self.wf());
+
+            assert(self.spec() == (OpInsertChild { parent, child }).update(old(self).spec()));
+
+            assert(self@.dom() == old(self)@.dom().insert(child));
+
+            (OpInsertChild{parent, child}).lemma_view_update(old(self).spec());
+            assert(self@ == insert_child(old(self)@, parent, child));
         };
     }
 
-    fn revoke_single(&mut self, key: CapKey)
+    pub fn revoke_single(&mut self, key: CapKey)
         requires
             old(self).wf(),
-            old(self).contains_key(key),
-            old(self).spec()[key].child.is_none(),
+            old(self)@.contains_key(key),
+            old(self)@[key].children.len() == 0,
         ensures
             self.wf(),
-            self.spec().dom() == old(self).spec().dom().remove(key),
-            view(self.spec()) == revoke_single_parent_update(view(old(self).spec()), key).remove(key),
+            self@.dom() == old(self)@.dom().remove(key),
+            self@ == revoke_single_parent_update(old(self)@, key).remove(key),
     {
         let tracked _ = self.instance.borrow().clean_links(self.spec.borrow(), self.state.borrow());
         let tracked token = self.instance.borrow_mut().revoke_single(
@@ -287,6 +303,7 @@ impl Meta {
         assert(self.spec().dom() == self.table@.dom());
 
         let tracked _ = {
+            // for well-formedness: show tokens and physical addresses agree
             assert forall|key: CapKey| #[trigger] self.table@.contains_key(key)
             implies {
                 &&& self.tokens@.value()[key].addr() == self.table@[key].addr()
@@ -295,19 +312,22 @@ impl Meta {
             by {
                 assert(self.tokens@.value()[key].addr() == self.table@[key].addr());
             };
+
+            assert(self.dom() == old(self).dom().remove(key));
+            assert(self@.dom() == old(self)@.dom().remove(key));
         };
     }
 
-    fn revoke_children(&mut self, key: CapKey)
+    pub fn revoke_children(&mut self, key: CapKey)
         requires
             old(self).wf(),
-            old(self).contains_key(key),
+            old(self)@.contains_key(key),
         ensures
             self.wf(),
-            self.contains_key(key),
-            self.spec()[key].child.is_none(),
-            self.dom() == old(self).dom().difference(transitive_children(view(old(self).spec()), key)).insert(key),
-            view(self.spec()).remove(key) == view(old(self).spec()).remove_keys(transitive_children(view(old(self).spec()), key)),
+            self@.contains_key(key),
+            self@[key].children.len() == 0,
+            self@.dom() == old(self)@.dom().difference(transitive_children(old(self)@, key)).insert(key),
+            self@.remove(key) == old(self)@.remove_keys(transitive_children(old(self)@, key)),
     {
         broadcast use vstd::set::group_set_axioms;
 
@@ -324,7 +344,7 @@ impl Meta {
         loop
             invariant
                 self.wf(),
-                self.contains_key(key),
+                self@.contains_key(key),
                 self.dom().disjoint(revoked_keys),
                 old(self).dom() == self.dom().union(revoked_keys),
                 subtree == transitive_children(view(self.spec()), key).union(revoked_keys),
@@ -350,7 +370,10 @@ impl Meta {
             };
 
             let ghost pre = self.spec();
+            assert(self@ == view(pre));
             self.revoke_single(child.key);
+            assert(view(pre).dom() == pre.dom());
+            assert(self.dom() == pre.dom().remove(child.key));
 
             let tracked _ = {
                 self.instance.borrow().weak_connections(self.spec.borrow());
@@ -383,7 +406,7 @@ impl Meta {
         let tracked _ = lemma_view_tree_ish(self.spec());
 
         assert forall |child: CapKey| {
-            &&& self.contains_key(child)
+            &&& self@.contains_key(child)
             &&& #[trigger] transitive_child_of(view(self.spec()), child, key)
         }
         implies child == key by {
@@ -402,12 +425,16 @@ impl Meta {
         assert(self.dom() == old(self).dom().difference(revoked_keys));
         assert(self.dom() ==
             old(self).dom().difference(transitive_children(view(old(self).spec()), key)).insert(key));
+
+        assert(
+            self@.dom() == old(self)@.dom().difference(transitive_children(view(old(self).spec()), key)).insert(key)
+        );
     }
 
     fn borrow_node(&self, key: CapKey) -> (res: &Node)
         requires
             self.wf(),
-            self.contains_key(key),
+            self@.contains_key(key),
         ensures
             self.get(key) == res,
             self.contains(res),
@@ -425,12 +452,8 @@ impl Meta {
     }
 
     spec fn contains(&self, node: &Node) -> bool {
-        &&& self.contains_key(node.key)
+        &&& self@.contains_key(node.key)
         &&& self.get(node.key) == node
-    }
-
-    spec fn contains_key(&self, key: CapKey) -> bool {
-        self.spec().contains_key(key)
     }
 
     spec fn get(&self, key: CapKey) -> Node {
@@ -448,7 +471,7 @@ impl Meta {
     fn first_child(&self, parent: CapKey) -> (res: &Node)
         requires
             self.wf(),
-            self.contains_key(parent),
+            self@.contains_key(parent),
         ensures
             res.child == 0,
             self.contains(res),
@@ -462,7 +485,7 @@ impl Meta {
         while res.child != 0
             invariant
                 self.wf(),
-                self.contains_key(parent),
+                self@.contains_key(parent),
                 self.contains(res),
                 transitive_child_of(view(self.spec()), res.key, parent),
             decreases
@@ -509,18 +532,18 @@ impl Meta {
         act_table.get_element()
     }
 
-    fn revoke_all(&mut self, activity: ActId)
+    pub fn revoke_all(&mut self, activity: ActId)
         requires
             old(self).wf(),
         ensures
             self.wf(),
-            self.dom().filter(|key: CapKey| key.0 == activity).is_empty()
+            self@.dom().filter(|key: CapKey| key.0 == activity).is_empty()
     {
         broadcast use vstd::set::group_set_axioms;
 
         loop
             invariant self.wf()
-            ensures self.dom().filter(|key: CapKey| key.0 == activity).is_empty()
+            ensures self@.dom().filter(|key: CapKey| key.0 == activity).is_empty()
             decreases self.dom().len()
         {
             let Some(cap) = self.cap_in(activity) else { break; };
@@ -529,12 +552,13 @@ impl Meta {
 
             self.revoke_children(cap);
             let ghost here = self.dom();
-            assert(self.dom().subset_of(before));
+            assert(self@.dom().subset_of(before));
             let tracked _ = lemma_len_subset(self.dom(), before);
             assert(self.dom().len() <= before.len());
 
             self.revoke_single(cap);
-            assert(self.dom() =~= here.remove(cap));
+            assert(self@.dom() =~= here.remove(cap));
+            assert(self.dom() == here.remove(cap));
             assert(self.dom().len() == here.len() - 1);
         }
     }
