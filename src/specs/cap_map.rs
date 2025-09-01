@@ -1,5 +1,7 @@
 use vstd::prelude::*;
 
+use crate::lemmas::lemma_depth_increase;
+
 verus! {
 
 pub type ActId = u16;
@@ -30,17 +32,12 @@ pub open spec fn sibling_of(map: CapMap, a: CapKey, b: CapKey) -> bool {
     get_parent(map, a) == get_parent(map, b)
 }
 
-pub open spec fn depth_fn_condition(f: spec_fn(CapKey) -> nat, map: CapMap, key: CapKey) -> bool {
-    if let Some(parent) = get_parent(map, key) {
-        f(key) == f(parent) + 1
-    }
-    else {
-        true
-    }
-}
-
 pub open spec fn depth_fn(f: spec_fn(CapKey) -> nat, map: CapMap) -> bool {
-    forall |key: CapKey| map.contains_key(key) ==> #[trigger] depth_fn_condition(f, map, key)
+    forall |p: CapKey, key: CapKey|
+        map.contains_key(key) &&
+        map.contains_key(p) &&
+        map[p].children.contains(key)
+        ==> f(key) == f(p) + 1
 }
 
 pub open spec fn depth(map: CapMap, key: CapKey) -> nat {
@@ -63,13 +60,15 @@ pub open spec fn parents(map: CapMap, key: CapKey) -> Set<CapKey> {
 #[via_fn]
 proof fn transitive_child_of_decreases(map: CapMap, child: CapKey, parent: CapKey) {
     assert forall|node: CapKey| #[trigger] map.contains_key(node) && map[node].children.contains(child)
-    implies false by // depth(map, node) < depth(map, child)
-    {}
+    implies depth(map, node) < depth(map, child) by
+    {
+        lemma_depth_increase(map, node, child);
+    }
 }
 
 pub open spec fn transitive_child_of(map: CapMap, child: CapKey, parent: CapKey) -> bool
     decreases depth(map, child),
-    when acyclic(map)
+    when acyclic(map) && map.contains_key(child)
     via transitive_child_of_decreases
 {
     if child == parent {

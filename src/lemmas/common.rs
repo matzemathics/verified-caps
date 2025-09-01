@@ -3,8 +3,8 @@ use vstd::{prelude::*, set_lib::lemma_len_subset};
 use crate::{
     specs::{
         cap_map::{
-            acyclic, child_of, depth, depth_fn, depth_fn_condition, get_parent, parents,
-            sibling_of, transitive_child_of, tree_ish, CapKey, CapMap,
+            acyclic, child_of, depth, depth_fn, get_parent, parents, sibling_of,
+            transitive_child_of, tree_ish, CapKey, CapMap,
         },
         link_map::{decreasing, decreasing_condition, siblings, view, Child, LinkMap, Next},
     },
@@ -557,14 +557,16 @@ pub proof fn lemma_view_acyclic(map: LinkMap)
         acyclic(view(map))
 {
     let d = |key| map[key].depth;
-    assert forall|key: CapKey| #[trigger] depth_fn_condition(d, view(map), key) by {
-        if let Some(parent) = get_parent(view(map), key) {
-            assert(decreasing_condition::<Child>(map, parent));
-            lemma_child_of_depth(map, key, parent);
-            lemma_siblings_contained(map, map[parent].child, key);
-        }
-        else { }
-    }
+    assert forall|parent: CapKey, key: CapKey|
+    map.contains_key(key) &&
+    map.contains_key(parent) &&
+    child_of(view(map), key, parent)
+    implies #[trigger] d(key) == #[trigger] d(parent) + 1
+    by {
+        assert(decreasing_condition::<Child>(map, parent));
+        lemma_child_of_depth(map, key, parent);
+        lemma_siblings_contained(map, map[parent].child, key);
+    };
 
     assert(depth_fn(d, view(map)));
 }
@@ -594,13 +596,10 @@ requires
     map.contains_key(child),
     child_of(map, child, parent),
     acyclic(map),
-    tree_ish(map)
 ensures
     depth(map, child) == depth(map, parent) + 1
 {
     let g = choose |f: spec_fn(CapKey) -> nat| depth_fn(f, map);
-    lemma_is_parent_of(map, parent, child);
-    assert(depth_fn_condition(g, map, child));
     assert(g(child) == g(parent) + 1);
 }
 

@@ -7,6 +7,9 @@
 #![default_lib_allocator]
 // #![cfg_attr(not(feature = "linux"), no_std)]
 
+use vstd::prelude::*;
+use vstd::simple_pptr::PPtr;
+
 pub extern crate alloc;
 
 pub mod boxed {
@@ -18,5 +21,7 @@ mod meta;
 mod specs;
 mod state;
 mod tables;
+
+verus! {}
 
 fn main() {}

@@ -10,9 +10,8 @@ use super::common::{
 };
 use crate::{
     specs::cap_map::{
-        acyclic, child_of, depth, depth_fn, depth_fn_condition, get_parent,
-        revoke_single_parent_update, sibling_of, transitive_child_of, transitive_children,
-        tree_ish, CapKey, CapMap,
+        acyclic, child_of, depth, depth_fn, get_parent, revoke_single_parent_update, sibling_of,
+        transitive_child_of, transitive_children, tree_ish, CapKey, CapMap,
     },
     specs::link_map::{decreasing, decreasing_condition, siblings, view, Child, LinkMap, Next},
     state::{back_link_condition, clean_links, SysState},
@@ -303,20 +302,23 @@ proof fn lemma_view_acyclic_post(pre: LinkMap, removed: CapKey)
     let post = revoke_single_parent_update(view(pre), removed).remove(removed);
 
     let d = |key| pre[key].depth;
-    assert forall|key: CapKey| #[trigger] depth_fn_condition(d, post, key) by {
-        if let Some(parent) = get_parent(post, key) {
-            assert(decreasing_condition::<Child>(pre, parent));
-            assert(post[parent].children.contains(key));
 
-            if get_parent(view(pre), removed) == Some(parent) {
-                lemma_seq_remove_value_contains_a(view(pre)[parent].children, removed, key);
-            }
+    assert forall|key: CapKey, parent: CapKey|
+    post.contains_key(key) &&
+    post.contains_key(parent) &&
+    child_of(post, key, parent)
+    implies #[trigger] d(key) == #[trigger] d(parent) + 1
+    by {
+        assert(decreasing_condition::<Child>(pre, parent));
+        assert(post[parent].children.contains(key));
 
-            assert(child_of(view(pre), key, parent));
-            lemma_child_of_depth(pre, key, parent);
-            lemma_siblings_contained(pre, pre[parent].child, key);
+        if get_parent(view(pre), removed) == Some(parent) {
+            lemma_seq_remove_value_contains_a(view(pre)[parent].children, removed, key);
         }
-        else { }
+
+        assert(child_of(view(pre), key, parent));
+        lemma_child_of_depth(pre, key, parent);
+        lemma_siblings_contained(pre, pre[parent].child, key);
     }
 
     assert(depth_fn(d, post));
