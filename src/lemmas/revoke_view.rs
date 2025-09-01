@@ -304,9 +304,7 @@ proof fn lemma_view_acyclic_post(pre: LinkMap, removed: CapKey)
     let d = |key| pre[key].depth;
 
     assert forall|key: CapKey, parent: CapKey|
-    post.contains_key(key) &&
-    post.contains_key(parent) &&
-    edge(post, parent, key)
+    post.contains_key(key) && edge(post, parent, key)
     implies #[trigger] d(key) == #[trigger] d(parent) + 1
     by {
         assert(decreasing_condition::<Child>(pre, parent));

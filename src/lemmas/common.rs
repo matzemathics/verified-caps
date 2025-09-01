@@ -366,7 +366,6 @@ pub proof fn lemma_child_of_depth(map: LinkMap, child: CapKey, parent: CapKey)
         edge(view(map), parent, child),
         decreasing::<Child>(map),
         decreasing::<Next>(map),
-        map.contains_key(parent),
     ensures
         map[child].depth == map[parent].depth + 1,
 {
@@ -388,8 +387,6 @@ pub proof fn lemma_child_of_univalent(
         clean_links(map),
         edge(view(map), parent_a, child),
         edge(view(map), parent_b, child),
-        map.contains_key(parent_a),
-        map.contains_key(parent_b),
     ensures
         parent_a == parent_b,
 {
@@ -487,6 +484,7 @@ pub proof fn lemma_sibling_of_next(map: LinkMap, key: CapKey)
         assert(ith_predecessor(map, child, step, next));
 
         lemma_predecessor_transitive(map, child, step - 1, key, 1, next);
+        assert(edge(view(map), alt_parent, key));
     }
 }
 
@@ -559,7 +557,6 @@ pub proof fn lemma_view_acyclic(map: LinkMap)
     let d = |key| map[key].depth;
     assert forall|parent: CapKey, key: CapKey|
     map.contains_key(key) &&
-    map.contains_key(parent) &&
     edge(view(map), parent, key)
     implies #[trigger] d(key) == #[trigger] d(parent) + 1
     by {
@@ -592,7 +589,6 @@ ensures
 
 pub proof fn lemma_depth_increase(map: CapMap, parent: CapKey, child: CapKey)
 requires
-    map.contains_key(parent),
     map.contains_key(child),
     edge(map, parent, child),
     acyclic(map),
@@ -634,7 +630,6 @@ requires
     acyclic(map),
     tree_ish(map),
     map.contains_key(child),
-    map.contains_key(parent),
     map.contains_key(top),
     transitive_child_of(map, child, top),
     edge(map, parent, child),
@@ -659,7 +654,6 @@ requires
     tree_ish(map),
     edge(map, top, parent),
     transitive_child_of(map, child, parent),
-    map.contains_key(top),
     map.contains_key(child),
 ensures
     transitive_child_of(map, child, top)
