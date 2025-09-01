@@ -17,14 +17,14 @@ pub ghost struct CapNode {
 }
 
 pub open spec fn get_parent(map: CapMap, child: CapKey) -> Option<CapKey> {
-    if exists|parent: CapKey| map.contains_key(parent) && child_of(map, child, parent) {
-        Some(choose|parent: CapKey| map.contains_key(parent) && child_of(map, child, parent))
+    if exists|parent: CapKey| map.contains_key(parent) && edge(map, parent, child) {
+        Some(choose|parent: CapKey| map.contains_key(parent) && edge(map, parent, child))
     } else {
         None
     }
 }
 
-pub open spec fn child_of(map: CapMap, child: CapKey, parent: CapKey) -> bool {
+pub open spec fn edge(map: CapMap, parent: CapKey, child: CapKey) -> bool {
     map[parent].children.contains(child)
 }
 
@@ -54,7 +54,7 @@ pub open spec fn tree_ish(map: CapMap) -> bool {
 }
 
 pub open spec fn parents(map: CapMap, key: CapKey) -> Set<CapKey> {
-    Set::new(|parent: CapKey| map.contains_key(parent) && child_of(map, key, parent))
+    Set::new(|parent: CapKey| map.contains_key(parent) && edge(map, parent, key))
 }
 
 #[via_fn]

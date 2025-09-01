@@ -10,7 +10,7 @@ use super::common::{
 };
 use crate::{
     specs::cap_map::{
-        acyclic, child_of, depth, depth_fn, get_parent, revoke_single_parent_update, sibling_of,
+        acyclic, depth, depth_fn, edge, get_parent, revoke_single_parent_update, sibling_of,
         transitive_child_of, transitive_children, tree_ish, CapKey, CapMap,
     },
     specs::link_map::{decreasing, decreasing_condition, siblings, view, Child, LinkMap, Next},
@@ -192,13 +192,13 @@ pub proof fn lemma_revoke_spec(pre: LinkMap, post: LinkMap, removed: CapKey)
         } else { }
     };
 
-    assert forall|parent: CapKey| post.contains_key(parent) && !child_of(view(pre), removed, parent)
+    assert forall|parent: CapKey| post.contains_key(parent) && !edge(view(pre), parent, removed)
     implies #[trigger] view(post)[parent] == view(pre)[parent] by {
         assert(pre[parent].depth == post[parent].depth);
         assert(get_parent(view(pre), removed) != Some(parent));
 
         if let Some(child) = pre[parent].child {
-            assert(child_of(view(pre), child, parent)) by {
+            assert(edge(view(pre), parent, child)) by {
                 lemma_siblings_unfold(pre, child);
                 assert(siblings(pre, pre[parent].child).last() == child);
             };
@@ -266,7 +266,7 @@ pub proof fn lemma_revoke_spec(pre: LinkMap, post: LinkMap, removed: CapKey)
                 lemma_parent_child(pre, back, removed);
                 if pre[removed].first_child {
                     lemma_child_of_first_child(pre, back);
-                    assert(child_of(view(pre), removed, back));
+                    assert(edge(view(pre), back, removed));
                 }
                 assert(!pre[removed].first_child);
 
@@ -280,8 +280,8 @@ pub proof fn lemma_revoke_spec(pre: LinkMap, post: LinkMap, removed: CapKey)
     implies view(post)[key] == revoke_single_parent_update(view(pre), removed).remove(removed)[key] by {
         if Some(key) == get_parent(view(pre), removed) {
         } else {
-            assert(!child_of(view(pre), removed, key)) by {
-                if child_of(view(pre), removed, key) {
+            assert(!edge(view(pre), key, removed)) by {
+                if edge(view(pre), key, removed) {
                     if let Some(parent) = get_parent(view(pre), removed) {
                         lemma_child_of_univalent(pre, key, parent, removed);
                     }
@@ -306,7 +306,7 @@ proof fn lemma_view_acyclic_post(pre: LinkMap, removed: CapKey)
     assert forall|key: CapKey, parent: CapKey|
     post.contains_key(key) &&
     post.contains_key(parent) &&
-    child_of(post, key, parent)
+    edge(post, parent, key)
     implies #[trigger] d(key) == #[trigger] d(parent) + 1
     by {
         assert(decreasing_condition::<Child>(pre, parent));
@@ -316,7 +316,7 @@ proof fn lemma_view_acyclic_post(pre: LinkMap, removed: CapKey)
             lemma_seq_remove_value_contains_a(view(pre)[parent].children, removed, key);
         }
 
-        assert(child_of(view(pre), key, parent));
+        assert(edge(view(pre), parent, key));
         lemma_child_of_depth(pre, key, parent);
         lemma_siblings_contained(pre, pre[parent].child, key);
     }
@@ -515,15 +515,15 @@ decreases
         lemma_depth_increase(pre, other, intermediate);
         lemma_still_transitive_child(pre, top, other, removed);
 
-        assert(!child_of(pre, removed, other)) by {
+        assert(!edge(pre, other, removed)) by {
             assert(depth(pre, other) < depth(pre, intermediate));
-            if child_of(pre, removed, other) {
+            if edge(pre, other, removed) {
                 lemma_depth_increase(pre, other, removed);
                 assert(depth(pre, intermediate) >= depth(pre, removed));
             }
         }
 
-        assert(child_of(post, intermediate, other));
+        assert(edge(post, other, intermediate));
     }
 }
 
