@@ -202,6 +202,16 @@ impl Meta {
             );
 
             assert(self.spec().dom() == self.table@.dom());
+
+            // for well-formedness: show tokens and physical addresses agree
+            assert forall|key: CapKey| #[trigger] self.table@.contains_key(key)
+            implies {
+                &&& self.tokens@.value()[key].addr() == self.table@[key].addr()
+                &&& self.get(key).key == key
+            }
+            by {
+                assert(self.tokens@.value()[key].addr() == self.table@[key].addr());
+            };
             assert(self.wf());
 
             assert(self.spec() == (OpInsertChild { parent, child }).update(old(self).spec()));

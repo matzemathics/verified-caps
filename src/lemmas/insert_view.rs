@@ -159,8 +159,8 @@ impl OpInsertChild {
     proof fn lemma_view_next_update(&self, map: LinkMap)
         requires
             map.contains_key(self.parent),
-            decreasing::<Next>(map),
-            decreasing::<Child>(map),
+            self.invariants(map),
+            self.invariants(self.next_update(map)),
         ensures
             view(self.next_update(map)) == view(map),
     {
@@ -175,7 +175,6 @@ impl OpInsertChild {
                     lemma_siblings_none_empty(self.next_update(map));
                 } else {
                     assert(decreasing_condition::<Child>(map, key));
-                    self.lemma_invariants_update_next(map);
                     lemma_siblings_unchanged(map, self.next_update(map), map[key].child.unwrap());
                 }
             };
@@ -192,102 +191,21 @@ impl OpInsertChild {
         &&& decreasing::<Next>(map)
     }
 
-    proof fn lemma_weak_next_update_child(&self, map: LinkMap)
-        requires
-            self.invariants(map),
-            !map.contains_key(self.child),
-        ensures
-            decreasing::<Next>(self.child_update(map)),
-    {
-        assert forall|key: CapKey|
-            self.child_update(map).contains_key(key) implies #[trigger] decreasing_condition::<Next>(
-            self.child_update(map),
-            key,
-        ) by {
-            if key == self.child {
-                assert(decreasing_condition::<Child>(map, self.parent));
-                assert(decreasing_condition::<Next>(self.child_update(map), self.child));
-            } else {
-                assert(decreasing_condition::<Next>(map, key));
-            }
-        };
-    }
-
-    proof fn lemma_weak_child_update_child(&self, map: LinkMap)
-        requires
-            self.invariants(map),
-            !map.contains_key(self.child),
-        ensures
-            decreasing::<Child>(self.child_update(map)),
-    {
-        assert forall|key: CapKey|
-            self.child_update(map).contains_key(key) implies #[trigger] decreasing_condition::<Child>(
-            self.child_update(map),
-            key,
-        ) by {
-            if key == self.child {
-            } else {
-                assert(decreasing_condition::<Child>(map, key));
-            }
-        };
-    }
-
-    proof fn lemma_invariants_update_next(&self, map: LinkMap)
-        requires
-            self.invariants(map),
-        ensures
-            self.invariants(self.next_update(map)),
-    {
-        assert forall|key: CapKey| #[trigger] self.next_update(map).contains_key(key) implies {
-            &&& decreasing_condition::<Next>(self.next_update(map), key)
-            &&& decreasing_condition::<Child>(self.next_update(map), key)
-        } by {
-            assert(decreasing_condition::<Child>(map, self.parent));
-            assert(decreasing_condition::<Next>(map, key));
-            assert(decreasing_condition::<Child>(map, key));
-        };
-    }
-
-    proof fn lemma_invariants_update_parent(&self, map: LinkMap)
-        requires
-            self.invariants(map),
-            map.contains_key(self.child),
-            map[self.child].depth == map[self.parent].depth + 1,
-        ensures
-            self.invariants(self.parent_update(map)),
-    {
-        assert forall|key: CapKey| #[trigger] self.parent_update(map).contains_key(key) implies {
-            &&& decreasing_condition::<Next>(self.parent_update(map), key)
-            &&& decreasing_condition::<Child>(self.parent_update(map), key)
-        } by {
-            assert(decreasing_condition::<Next>(map, key));
-
-            if key == self.parent {
-                assert(decreasing_condition::<Child>(self.parent_update(map), self.parent));
-            } else {
-                assert(decreasing_condition::<Child>(map, key));
-            };
-        };
-    }
-
     pub proof fn lemma_view_update(&self, map: LinkMap)
         requires
             !map.contains_key(self.child),
             self.invariants(map),
+            self.invariants(self.child_update(map)),
+            self.invariants(self.next_update(self.child_update(map))),
+            self.invariants(self.update(map)),
         ensures
             view(self.update(map)) == insert_child(view(map), self.parent, self.child),
     {
         self.lemma_view_child_update(map);
-        self.lemma_weak_next_update_child(map);
-        self.lemma_weak_child_update_child(map);
         self.lemma_view_next_update(self.child_update(map));
-        self.lemma_invariants_update_next(self.child_update(map));
 
         let checkpoint = self.next_update(self.child_update(map));
         assert(view(checkpoint) == view(map).insert(self.child, self.insert_view_node(map)));
-
-        self.lemma_invariants_update_parent(checkpoint);
-        assert(decreasing::<Next>(self.update(map)));
 
         assert forall|key: CapKey| self.update(map).contains_key(key) implies #[trigger] siblings(
             checkpoint,
@@ -296,31 +214,24 @@ impl OpInsertChild {
             lemma_siblings_unchanged(checkpoint, self.update(map), key);
         }
 
-        lemma_siblings_unfold(self.update(map), self.child);
-        assert(siblings(self.update(map), Some(self.child)) == view(
-            checkpoint,
-        )[self.parent].children.push(self.child));
-
-        assert forall|key: CapKey|
-            self.update(map).contains_key(key) && key != self.parent implies #[trigger] view(
-            self.update(map),
-        )[key] == view(checkpoint)[key] by {
+        assert forall|key: CapKey| self.update(map).contains_key(key) && key != self.parent
+        implies #[trigger] view(self.update(map))[key] == view(checkpoint)[key]
+        by {
             assert(self.update(map)[key] == checkpoint[key]);
             assert(decreasing_condition::<Child>(checkpoint, key));
         };
 
         assert(decreasing_condition::<Child>(self.update(map), self.parent));
-        let CapNode { children } = view(map)[self.parent];
+        let CapNode { children } = view(checkpoint)[self.parent];
+        lemma_siblings_unfold(self.update(map), self.child);
+        assert(siblings(self.update(map), Some(self.child)) == children.push(self.child));
+
         let parent_node = CapNode { children: children.push(self.child) };
         let child_node = CapNode { children: Seq::empty() };
         assert(view(self.update(map))[self.parent] == parent_node);
 
         assert(view(checkpoint) == view(map).insert(self.child, child_node));
         assert(view(self.update(map)) =~= view(checkpoint).insert(self.parent, parent_node));
-        assert(insert_child(view(map), self.parent, self.child) == view(map).insert(
-            self.child,
-            child_node,
-        ).insert(self.parent, parent_node));
     }
 }
 

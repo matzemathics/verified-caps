@@ -434,6 +434,9 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             update map = new_map;
             update all_tokens = pre.all_tokens.insert(key, t);
             update depth = vstd::math::max(pre.depth as int, inserted.depth + 1 as int) as nat;
+
+            assert(decreasing::<Child>(new_map));
+            assert(decreasing::<Next>(new_map));
         }
     }
 
@@ -534,6 +537,9 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             update state = SysState::InsertChild { inserted, parent, next: LinkState::Fixed(next) };
             update map = new_map;
             update all_tokens = pre.all_tokens.insert(next, token);
+
+            assert(decreasing::<Child>(new_map));
+            assert(decreasing::<Next>(new_map));
         }
     }
 
@@ -568,6 +574,8 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             update state = SysState::Clean;
             update map = new_map;
             update all_tokens = pre.all_tokens.insert(parent, p);
+
+            assert(clean_links(new_map));
         }
     }
 
