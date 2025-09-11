@@ -1,4 +1,7 @@
-use vstd::{prelude::*, std_specs::hash::*};
+use vstd::prelude::*;
+
+#[cfg(verus_keep_ghost)]
+use vstd::std_specs::hash::*;
 
 use crate::specs::cap_map::{ActId, CapId, CapKey};
 

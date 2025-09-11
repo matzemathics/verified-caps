@@ -1,8 +1,9 @@
 use vstd::prelude::*;
 
-use crate::lemmas::lemma_depth_increase;
-
 verus! {
+
+#[cfg(verus_keep_ghost)]
+use crate::lemmas::lemma_depth_increase;
 
 pub type ActId = u16;
 pub type CapId = u64;

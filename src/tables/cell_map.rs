@@ -319,6 +319,7 @@ impl<Key: View + Eq + Hash, Value> MutMap<Key, Value> {
     }
 }
 
+#[cfg(verus_keep_ghost)]
 fn test() {
     assert(vstd::std_specs::hash::obeys_key_model::<i32>()) by { admit() };
 

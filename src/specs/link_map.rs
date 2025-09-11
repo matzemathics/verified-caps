@@ -1,8 +1,10 @@
 use vstd::prelude::*;
 
-use super::cap_map::{CapKey, CapMap, CapNode};
-
 verus! {
+
+use super::cap_map::CapKey;
+#[cfg(verus_keep_ghost)]
+use super::cap_map::{CapMap, CapNode};
 
 pub ghost struct LinkedNode {
     pub back: Option<CapKey>,

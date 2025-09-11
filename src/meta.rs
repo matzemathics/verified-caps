@@ -1,9 +1,14 @@
 use vstd::{
     prelude::*,
-    set_lib::lemma_len_subset,
     simple_pptr::{PPtr, PointsTo},
 };
 
+verus! {
+
+#[cfg(verus_keep_ghost)]
+use vstd::set_lib::lemma_len_subset;
+
+#[cfg(verus_keep_ghost)]
 use crate::{
     lemmas::{
         insert_view::OpInsertChild,
@@ -18,15 +23,18 @@ use crate::{
     specs::{
         cap_map::{
             get_parent, insert_child, revoke_single_parent_update, transitive_child_of,
-            transitive_children, ActId, CapKey, CapMap,
+            transitive_children, CapMap
         },
         link_map::{decreasing_condition, siblings, view, Child, LinkMap},
     },
-    state::{LinkSystem, SysState, Token},
-    tables::{HashMetaCapTable, MetaCapTable},
+    state::SysState,
 };
 
-verus! {
+use crate::{
+    specs::cap_map::{ActId, CapKey},
+    state::{LinkSystem, Token},
+    tables::{HashMetaCapTable, MetaCapTable},
+};
 
 struct Node {
     next: usize,

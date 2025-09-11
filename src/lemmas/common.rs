@@ -1,5 +1,11 @@
-use vstd::{prelude::*, set_lib::lemma_len_subset};
+use vstd::prelude::*;
 
+verus! {
+
+#[cfg(verus_keep_ghost)]
+use vstd::set_lib::lemma_len_subset;
+
+#[cfg(verus_keep_ghost)]
 use crate::{
     specs::{
         cap_map::{
@@ -12,8 +18,6 @@ use crate::{
         back_link_condition, child_link_condition, clean_links, next_link_condition, SysState,
     },
 };
-
-verus! {
 
 pub proof fn lemma_siblings_contained(map: LinkMap, link: Option<CapKey>, key: CapKey)
     requires

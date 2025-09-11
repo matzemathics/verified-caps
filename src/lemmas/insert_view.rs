@@ -1,15 +1,19 @@
 use vstd::prelude::*;
 
+verus! {
+
+#[cfg(verus_keep_ghost)]
 use super::common::{lemma_siblings_none_empty, lemma_siblings_unchanged, lemma_siblings_unfold};
+#[cfg(verus_keep_ghost)]
 use crate::{
-    specs::cap_map::{insert_child, CapKey, CapNode},
+    specs::cap_map::{insert_child, CapNode},
     specs::link_map::{
         decreasing, decreasing_condition, next_index, siblings, view, Child, LinkMap, LinkedNode,
         Next,
     },
 };
 
-verus! {
+use crate::specs::cap_map::CapKey;
 
 pub proof fn lemma_insert_siblings_unchanged(map: LinkMap, new: (CapKey, LinkedNode), key: CapKey)
     requires

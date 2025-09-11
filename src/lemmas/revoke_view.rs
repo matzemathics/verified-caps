@@ -1,5 +1,8 @@
 use vstd::prelude::*;
 
+verus! {
+
+#[cfg(verus_keep_ghost)]
 use super::common::{
     lemma_child_of_depth, lemma_child_of_first_child, lemma_child_of_univalent,
     lemma_depth_increase, lemma_parent_child, lemma_seq_remove_value_contains_a,
@@ -8,6 +11,8 @@ use super::common::{
     lemma_siblings_none_empty, lemma_siblings_unchanged_after, lemma_siblings_unchanged_local,
     lemma_siblings_unfold, lemma_transitive_child_extend, lemma_view_acyclic, lemma_view_tree_ish,
 };
+
+#[cfg(verus_keep_ghost)]
 use crate::{
     specs::cap_map::{
         acyclic, depth, depth_fn, edge, get_parent, revoke_single_parent_update, sibling_of,
@@ -16,8 +21,6 @@ use crate::{
     specs::link_map::{decreasing, decreasing_condition, siblings, view, Child, LinkMap, Next},
     state::{back_link_condition, clean_links, SysState},
 };
-
-verus! {
 
 pub open spec fn close_to(map: LinkMap, target: CapKey, key: CapKey) -> bool {
     key == target || map[target].next == Some(key) || map[target].back == Some(key)

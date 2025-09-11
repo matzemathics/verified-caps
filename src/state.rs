@@ -1,12 +1,12 @@
 use verus_state_machines_macros::tokenized_state_machine;
 use vstd::prelude::*;
 
-use crate::specs::{
-    cap_map::CapKey,
-    link_map::{decreasing, next_index, Child, LinkMap, LinkedNode, Next},
-};
-
 verus! {
+
+#[cfg(verus_keep_ghost)]
+use crate::specs::link_map::{decreasing, next_index, Child, LinkedNode, Next};
+use crate::specs::link_map::LinkMap;
+use crate::specs::cap_map::CapKey;
 
 pub ghost enum LinkState {
     Null,
