@@ -1,3 +1,9 @@
+//! This map implementation works around a limitation of the vstd library,
+//! namely that we cannot mutate elements inside a `HashMapWithView`.
+//!
+//! We side-step this limitation by using interior mutability with `PCell`,
+//! allowing us to mutate values through immutable references.
+
 use core::hash::Hash;
 use vstd::{
     cell::{CellId, MemContents, PCell, PointsTo},
@@ -8,7 +14,7 @@ use vstd::{
 verus! {
 
 // there are multiple options for implementing mutation / retaking ownership of hashmap elements
-// 1 - extend vstd or re-wrap rust std library (assuming the rust implementation is sound)
+// 1 - extend vstd or re-wrap rust std library
 // 2 - use PCell to have "interior mutability"
 // 3 - use PPtr to introduce an additional redirection -> allows referencing elements from the outside
 #[verifier::reject_recursive_types(K)]

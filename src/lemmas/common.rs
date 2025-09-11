@@ -1,3 +1,9 @@
+//! This module contains proofs of some general lemmas about
+//! `LinkMap`, `CapMap`, and their relationship.
+//!
+//! In particular it proves that each `LinkMap` which is correctly linked
+//! can be `view`ed as a forest (i.e. it's `view` is `acyclic` and `tree_ish`)
+
 use vstd::prelude::*;
 
 verus! {

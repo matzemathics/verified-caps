@@ -1,3 +1,11 @@
+//! This module contains all major _external_ specifications:
+//!
+//! A `CapMap` is a map from `CapKey`s to the sequence of the children of this capability.
+//!
+//! - it generally should be `acyclic` and `tree_ish`
+//! - `edge` and `transitive_child_of` are parent-child relations
+//! - `insert_child` and `revoke_single_parent_update` are the specifications of operations in `Meta`
+
 use vstd::prelude::*;
 
 verus! {
@@ -8,8 +16,6 @@ use crate::lemmas::lemma_depth_increase;
 pub type ActId = u16;
 pub type CapId = u64;
 pub type CapKey = (ActId, CapId);
-
-pub type CapData = u64;
 
 pub type CapMap = Map<CapKey, CapNode>;
 

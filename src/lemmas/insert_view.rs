@@ -1,3 +1,7 @@
+//! This module proves that the link updates performed by `Meta::insert_child`
+//! lead to a `view` that corresponds to to the
+//! `specs::cap_map::insert_child` specification.
+
 use vstd::prelude::*;
 
 verus! {

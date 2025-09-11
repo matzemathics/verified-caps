@@ -1,3 +1,12 @@
+//! A `LinkMap` is a refined version of a `CapMap` that is close to
+//! the physical data structure.
+//!
+//! It consists of nodes that have a `next`, `child` and `back` link,
+//! represented as `Option<CapKey>`.
+//!
+//! The `view` links `LinkMap` to `CapMap` by setting the children of
+//! each node to `siblings(self.child)`
+
 use vstd::prelude::*;
 
 verus! {

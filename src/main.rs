@@ -8,6 +8,7 @@ pub mod boxed {
     pub use alloc::boxed::Box;
 }
 
+#[cfg(verus_keep_ghost)]
 mod lemmas;
 mod meta;
 mod specs;

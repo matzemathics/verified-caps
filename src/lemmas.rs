@@ -1,3 +1,7 @@
+//! This module is a collection of "pure-ghost" code, i.e. code that uses
+//! neither executable nor linear ghost types and is only relevant to the
+//! smt-solver.
+
 mod common;
 pub mod insert_view;
 pub mod revoke_view;

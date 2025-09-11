@@ -1,3 +1,14 @@
+//! This module ties together all specifications, proofs and tokens
+//! and provides a single `Meta` structure that acts as
+//! a map of CapabilityTables:
+//!
+//! it supports
+//! - `insert_root`
+//! - `insert_child`
+//! - `revoke_leaf`
+//! - `revoke_children`
+//! - `revoke_all`
+
 use vstd::{
     prelude::*,
     simple_pptr::{PPtr, PointsTo},

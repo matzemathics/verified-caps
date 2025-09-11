@@ -1,3 +1,6 @@
+//! This module defines the traits and structures used for
+//! the hash-table implementation of a `Meta`-capability-system
+
 use vstd::prelude::*;
 
 #[cfg(verus_keep_ghost)]

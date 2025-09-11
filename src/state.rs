@@ -1,3 +1,8 @@
+//! This module ensures the safety of raw pointer accesses:
+//!
+//! It defines a tokenized state machine, `LinkSystem`, which tracks
+//! the Tokens that make up the physical implementation of a `LinkMap`.
+
 use verus_state_machines_macros::tokenized_state_machine;
 use vstd::prelude::*;
 
