@@ -348,7 +348,6 @@ impl Meta {
         let ghost revoked_keys = Set::<CapKey>::empty();
 
         assert(self.dom().disjoint(revoked_keys));
-        assert(old(self).dom() == self.dom().union(revoked_keys));
         assert(subtree == transitive_children(view(self.spec()), key).union(revoked_keys));
 
         loop

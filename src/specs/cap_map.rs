@@ -50,7 +50,9 @@ pub open spec fn acyclic(map: CapMap) -> bool {
 }
 
 pub open spec fn tree_ish(map: CapMap) -> bool {
-    forall |k: CapKey| map.contains_key(k) ==> parents(map, k).finite() && #[trigger] parents(map, k).len() <= 1
+    forall |k: CapKey| map.contains_key(k)
+    ==> parents(map, k).finite() &&
+     #[trigger] parents(map, k).len() <= 1
 }
 
 pub open spec fn parents(map: CapMap, key: CapKey) -> Set<CapKey> {
