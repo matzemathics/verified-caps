@@ -9,9 +9,12 @@
 //! - `revoke_children`
 //! - `revoke_all`
 
+use std::{borrow::Borrow, ptr::null_mut};
+
 use vstd::{
+    layout::{layout_for_type_is_valid, valid_layout},
     prelude::*,
-    simple_pptr::{PPtr, PointsTo},
+    raw_ptr::{self, allocate, deallocate, ptr_mut_read, ptr_mut_write, ptr_ref},
 };
 
 verus! {
@@ -48,38 +51,90 @@ use crate::{
 };
 
 struct Node {
-    next: usize,
-    child: usize,
-    back: usize,
+    next: *mut Node,
+    child: *mut Node,
+    back: *mut Node,
     first_child: bool,
     key: CapKey,
 }
 
-impl Token for PointsTo<Node> {
-    closed spec fn addr(&self) -> usize {
-        self.pptr().addr()
+global layout Node is size == 48, align == 8;
+
+tracked struct NodePerm {
+    pt: raw_ptr::PointsTo<Node>,
+    dealloc: raw_ptr::Dealloc,
+}
+
+impl NodePerm {
+    #[verifier::type_invariant]
+    spec fn wf(&self) -> bool {
+        &&& self.pt.is_init()
+        &&& self.pt.ptr()@.addr != 0
+        &&& self.pt.ptr()@.addr == self.dealloc.addr()
+        &&& self.pt.ptr()@.provenance == self.dealloc.provenance()
+        &&& self.dealloc.size() == size_of::<Node>()
+        &&& self.dealloc.align() == align_of::<Node>()
+    }
+
+    spec fn back(&self) -> *mut Node {
+        self.pt.value().back
+    }
+
+    spec fn next(&self) -> *mut Node {
+        self.pt.value().next
+    }
+
+    spec fn child(&self) -> *mut Node {
+        self.pt.value().child
+    }
+
+    spec fn first_child(&self) -> bool {
+        self.pt.value().first_child
+    }
+
+    proof fn is_init(tracked &self)
+    ensures self.pt.is_init()
+    {
+        use_type_invariant(self)
+    }
+
+    proof fn is_wf(tracked &self)
+    ensures self.wf()
+    {
+        use_type_invariant(self)
+    }
+}
+
+impl Token for NodePerm {
+    type Inner = Node;
+
+    closed spec fn ptr(&self) -> *mut Node {
+        self.pt.ptr()
     }
 
     proof fn is_nonnull(tracked &self)
         ensures
-            self.addr() != 0,
+            self.ptr()@.addr != 0,
     {
-        self.is_nonnull()
+        self.pt.is_nonnull()
     }
 
-    closed spec fn cond(&self, next: usize, child: usize, back: usize, first_child: bool) -> bool {
-        self.is_init() && self.value().back == back && self.value().child == child
-            && self.value().next == next && self.value().first_child == first_child
+    closed spec fn cond(&self, next: *mut Node, child: *mut Node, back: *mut Node, first_child: bool) -> bool {
+        &&& self.wf()
+        &&& self.back() == back
+        &&& self.child() == child
+        &&& self.next() == next
+        &&& self.first_child() == first_child
     }
 }
 
 struct Meta {
-    table: HashMetaCapTable<PPtr<Node>>,
-    instance: Tracked<LinkSystem::Instance<PointsTo<Node>>>,
-    spec: Tracked<LinkSystem::map<PointsTo<Node>>>,
-    tokens: Tracked<LinkSystem::all_tokens<PointsTo<Node>>>,
-    state: Tracked<LinkSystem::state<PointsTo<Node>>>,
-    generation: Tracked<LinkSystem::depth<PointsTo<Node>>>,
+    table: HashMetaCapTable<*mut Node>,
+    instance: Tracked<LinkSystem::Instance<NodePerm>>,
+    spec: Tracked<LinkSystem::map<NodePerm>>,
+    tokens: Tracked<LinkSystem::all_tokens<NodePerm>>,
+    state: Tracked<LinkSystem::state<NodePerm>>,
+    generation: Tracked<LinkSystem::depth<NodePerm>>,
 }
 
 impl Meta {
@@ -97,7 +152,7 @@ impl Meta {
         &&& self.state@.value() == SysState::Clean
         &&& self.dom() == self.table@.dom()
         &&& forall|key: CapKey| self.table@.contains_key(key) ==> {
-            &&& #[trigger] self.tokens@.value()[key].addr() == self.table@[key].addr()
+            &&& #[trigger] self.tokens@.value()[key].ptr() == self.table@[key]
             &&& self.get(key).key == key
         }
     }
@@ -113,8 +168,22 @@ impl Meta {
         ensures
             self.wf(),
     {
-        let node = Node { next: 0, child: 0, back: 0, first_child: false, key };
-        let (ptr, Tracked(token)) = PPtr::new(node);
+        let node = Node {
+            next: null_mut(),
+            child: null_mut(),
+            back: null_mut(),
+            first_child: false,
+            key
+        };
+
+        layout_for_type_is_valid::<Node>();
+        let (ptr, Tracked(mut pt), Tracked(dealloc)) = allocate(size_of::<Node>(), align_of::<Node>());
+        let tracked pt = pt.into_typed::<Node>(ptr@.addr);
+        let tracked _ = pt.is_nonnull();
+        let ptr: *mut Node = ptr as _;
+
+        ptr_mut_write(ptr, Tracked(&mut pt), node);
+        let tracked token = NodePerm { pt, dealloc };
 
         let tracked _ = token.is_nonnull();
         let tracked _ = self.instance.borrow_mut().insert_root(
@@ -148,9 +217,16 @@ impl Meta {
         let parent_ptr = *self.table.get(parent).unwrap();
         let next = self.borrow_node(parent).child;
 
-        let node = Node { key: child, next, child: 0, back: parent_ptr.addr(), first_child: true };
+        let node = Node { key: child, next, child: null_mut(), back: parent_ptr, first_child: true };
 
-        let (ptr, Tracked(token)) = PPtr::new(node);
+        layout_for_type_is_valid::<Node>();
+        let (ptr, Tracked(mut pt), Tracked(dealloc)) = allocate(size_of::<Node>(), align_of::<Node>());
+        let tracked pt = pt.into_typed::<Node>(ptr@.addr);
+        let tracked _ = pt.is_nonnull();
+        let ptr: *mut Node = ptr as _;
+
+        ptr_mut_write(ptr, Tracked(&mut pt), node);
+        let tracked token = NodePerm { pt, dealloc };
 
         self.table.insert(child, ptr);
 
@@ -171,15 +247,17 @@ impl Meta {
             token,
         );
 
-        assert(parent_ptr.addr() == parent_token.addr());
-        let mut parent_node = parent_ptr.take(Tracked(&mut parent_token));
+        assert(parent_ptr == parent_token.ptr());
+        let tracked _ = parent_token.is_wf();
+        let tracked NodePerm { pt: parent_pt, dealloc: parent_dealloc } = parent_token;
+        let mut parent_node = ptr_mut_read(parent_ptr, Tracked(&mut parent_pt));
 
-        if parent_node.child == 0 {
+        if parent_node.child as usize == 0 {
             proof!{
                 self.lemma_child_null_imp_none(&parent_node);
             };
         } else {
-            let tracked next_perm = self.instance.borrow_mut().insert_child_fix_next(
+            let tracked NodePerm { pt, dealloc } = self.instance.borrow_mut().insert_child_fix_next(
                 child,
                 parent,
                 self.spec.borrow(),
@@ -187,29 +265,30 @@ impl Meta {
                 self.state.borrow_mut(),
             );
 
-            let next_ptr = PPtr::<Node>::from_addr(parent_node.child);
-            assert(next_ptr.addr() == next_perm.addr());
+            let next_ptr = parent_node.child;
+            assert(next_ptr == pt.ptr());
 
-            let mut next_node = next_ptr.take(Tracked(&mut next_perm));
-            next_node.back = ptr.addr();
+            let mut next_node = ptr_mut_read(next_ptr, Tracked(&mut pt));
+            next_node.back = ptr;
             next_node.first_child = false;
-            next_ptr.put(Tracked(&mut next_perm), next_node);
+            ptr_mut_write(next_ptr, Tracked(&mut pt), next_node);
 
             let ghost next = self.spec()[parent].child.unwrap();
             let tracked _ = self.instance.borrow_mut().insert_child_finish_next(
-                next_perm,
+                NodePerm { pt, dealloc },
                 child,
                 parent,
                 next,
                 self.spec.borrow_mut(),
                 self.tokens.borrow_mut(),
                 self.state.borrow_mut(),
-                next_perm,
+                NodePerm { pt, dealloc },
             );
         }
 
-        parent_node.child = ptr.addr();
-        parent_ptr.put(Tracked(&mut parent_token), parent_node);
+        parent_node.child = ptr;
+        ptr_mut_write(parent_ptr, Tracked(&mut parent_pt), parent_node);
+        let tracked parent_token = NodePerm { pt: parent_pt, dealloc: parent_dealloc };
 
         proof! {
             self.instance.borrow_mut().finish_insert(
@@ -261,9 +340,12 @@ impl Meta {
         );
 
         let ptr = *self.table.get(key).unwrap();
-        let node = ptr.take(Tracked(&mut token));
+        assert(ptr == token.ptr());
+        let tracked _ = token.is_wf();
+        let tracked NodePerm { pt: rev_pt, dealloc: rev_dealloc } = token;
+        let node = ptr_mut_read(ptr, Tracked(&mut rev_pt));
 
-        if node.back == 0 {
+        if node.back as usize == 0 {
             proof!{ self.lemma_back_null_imp_none(&node); }
         } else {
             let tracked tok = self.instance.borrow_mut().revoke_take_back(
@@ -272,25 +354,26 @@ impl Meta {
                 self.state.borrow_mut(),
             );
 
-            let back_ptr = PPtr::from_addr(node.back);
-            let mut back_node: Node = back_ptr.take(Tracked(&mut tok));
+            assert(node.back == tok.ptr());
+            let tracked NodePerm { pt, dealloc } = tok;
+            let mut back_node: Node = ptr_mut_read(node.back, Tracked(&mut pt));
 
             match node.first_child {
                 true => back_node.child = node.next,
                 false => back_node.next = node.next,
             }
 
-            back_ptr.put(Tracked(&mut tok), back_node);
+            ptr_mut_write(node.back, Tracked(&mut pt), back_node);
             let tracked _ = self.instance.borrow_mut().revoke_put_back(
-                tok,
+                NodePerm { pt, dealloc },
                 self.spec.borrow_mut(),
                 self.tokens.borrow_mut(),
                 self.state.borrow_mut(),
-                tok,
+                NodePerm { pt, dealloc },
             );
         }
 
-        if node.next == 0 {
+        if node.next as usize == 0 {
             proof!{ self.lemma_next_null_imp_none(&node); }
         } else {
             let tracked tok = self.instance.borrow_mut().revoke_take_next(
@@ -299,24 +382,26 @@ impl Meta {
                 self.state.borrow_mut(),
             );
 
-            let next_ptr = PPtr::<Node>::from_addr(node.next);
-            let mut next_node = next_ptr.take(Tracked(&mut tok));
+            assert(node.next == tok.ptr());
+            let tracked NodePerm { pt, dealloc } = tok;
+            let mut next_node = ptr_mut_read(node.next, Tracked(&mut pt));
 
             next_node.back = node.back;
             next_node.first_child = node.first_child;
 
-            next_ptr.put(Tracked(&mut tok), next_node);
+            ptr_mut_write(node.next, Tracked(&mut pt), next_node);
             let tracked _ = self.instance.borrow_mut().revoke_put_next(
-                tok,
+                NodePerm { pt, dealloc },
                 self.spec.borrow_mut(),
                 self.tokens.borrow_mut(),
                 self.state.borrow_mut(),
-                tok,
+                NodePerm { pt, dealloc },
             );
         }
 
         self.table.remove(key);
-        ptr.free(Tracked(token));
+        let tracked rev_pt = rev_pt.into_raw();
+        deallocate(ptr as _, size_of::<Node>(), align_of::<Node>(), Tracked(rev_pt), Tracked(rev_dealloc));
 
         assert(self.spec().dom() == old(self).spec().dom());
 
@@ -475,8 +560,10 @@ impl Meta {
             self.tokens.borrow(),
             self.state.borrow(),
         );
-        assert(ptr.addr() == borrow.addr());
-        ptr.borrow(Tracked(borrow))
+        assert(ptr == borrow.ptr());
+        let tracked _ = borrow.is_init();
+        assert(borrow.pt.value().key == key);
+        ptr_ref(*ptr as *const _, Tracked(&borrow.pt))
     }
 
     spec fn contains(&self, node: &Node) -> bool {
@@ -485,7 +572,7 @@ impl Meta {
     }
 
     spec fn get(&self, key: CapKey) -> Node {
-        self.tokens@.value()[key].value()
+        self.tokens@.value()[key].pt.value()
     }
 
     spec fn dom(&self) -> Set<CapKey> {
@@ -501,7 +588,7 @@ impl Meta {
             self.wf(),
             self@.contains_key(parent),
         ensures
-            res.child == 0,
+            res.child@.addr == 0,
             self.contains(res),
             transitive_child_of(view(self.spec()), res.key, parent),
     {
@@ -510,7 +597,7 @@ impl Meta {
         let tracked _ = lemma_view_acyclic(self.spec());
         assert(transitive_child_of(view(self.spec()), res.key, parent));
 
-        while res.child != 0
+        while res.child as usize != 0
             invariant
                 self.wf(),
                 self@.contains_key(parent),
@@ -544,7 +631,7 @@ impl Meta {
                 )
             };
 
-            res = PPtr::from_addr(res.child).borrow(Tracked(token));
+            res = ptr_ref(res.child, Tracked(&token.pt));
         }
 
         res
@@ -593,7 +680,7 @@ impl Meta {
 
     proof fn lemma_next_null_imp_none(tracked &self, node: &Node)
         requires
-            node.next == 0,
+            node.next@.addr == 0,
             self.contains(node),
             self.ties(),
         ensures
@@ -607,18 +694,18 @@ impl Meta {
                 self.tokens.borrow(),
             );
             self.instance.borrow().contains_next(node.key, self.spec.borrow());
-            self.instance.borrow().addr_nonnull(
+            self.instance.borrow().token_invariant(
                 next_key.unwrap(),
                 self.spec.borrow(),
-                self.tokens.borrow(),
+                self.tokens.borrow()
             );
-            assert(node.child != 0);
+            assert(node.child@.addr != 0);
         }
     }
 
     proof fn lemma_child_null_imp_none(tracked &self, node: &Node)
         requires
-            node.child == 0,
+            node.child@.addr == 0,
             self.contains(node),
             self.ties(),
         ensures
@@ -633,18 +720,18 @@ impl Meta {
                 self.tokens.borrow(),
             );
             self.instance.borrow().contains_child(node.key, self.spec.borrow());
-            self.instance.borrow().addr_nonnull(
+            self.instance.borrow().token_invariant(
                 child_key.unwrap(),
                 self.spec.borrow(),
                 self.tokens.borrow(),
             );
-            assert(node.child != 0);
+            assert(node.child@.addr != 0);
         }
     }
 
     proof fn lemma_back_null_imp_none(tracked &self, node: &Node)
         requires
-            node.back == 0,
+            node.back@.addr == 0,
             self.contains(node),
             self.ties(),
         ensures
@@ -659,12 +746,12 @@ impl Meta {
                 self.tokens.borrow(),
             );
             self.instance.borrow().contains_back(node.key, self.spec.borrow());
-            self.instance.borrow().addr_nonnull(
+            self.instance.borrow().token_invariant(
                 back_key.unwrap(),
                 self.spec.borrow(),
                 self.tokens.borrow(),
             );
-            assert(node.back != 0);
+            assert(node.back@.addr != 0);
         }
     }
 }

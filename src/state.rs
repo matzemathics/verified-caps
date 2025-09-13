@@ -3,8 +3,11 @@
 //! It defines a tokenized state machine, `LinkSystem`, which tracks
 //! the Tokens that make up the physical implementation of a `LinkMap`.
 
+use std::ptr::null_mut;
+
 use verus_state_machines_macros::tokenized_state_machine;
 use vstd::prelude::*;
+use vstd::raw_ptr::ptr_null_mut;
 
 verus! {
 
@@ -150,14 +153,26 @@ pub open spec fn child_link_condition(state: SysState, map: LinkMap, key: CapKey
 }
 
 pub trait Token: Sized {
-    spec fn addr(&self) -> usize;
+    type Inner;
+
+    spec fn ptr(&self) -> *mut Self::Inner;
+
+    open spec fn addr(&self) -> usize {
+        self.ptr()@.addr
+    }
 
     proof fn is_nonnull(tracked &self)
         ensures
-            self.addr() != 0,
+            self.ptr()@.addr != 0,
     ;
 
-    spec fn cond(&self, next: usize, child: usize, back: usize, first_child: bool) -> bool;
+    spec fn cond(
+        &self,
+        next: *mut Self::Inner,
+        child: *mut Self::Inner,
+        back: *mut Self::Inner,
+        first_child: bool
+    ) -> bool;
 }
 
 pub open spec fn token_invariant<T: Token>(
@@ -166,21 +181,21 @@ pub open spec fn token_invariant<T: Token>(
     key: CapKey,
 ) -> bool {
     let next = if map[key].next.is_none() {
-        0
+        null_mut()
     } else {
-        tokens[map[key].next.unwrap()].addr()
+        tokens[map[key].next.unwrap()].ptr()
     };
 
     let child = if map[key].child.is_none() {
-        0
+        null_mut()
     } else {
-        tokens[map[key].child.unwrap()].addr()
+        tokens[map[key].child.unwrap()].ptr()
     };
 
     let back = if map[key].back.is_none() {
-        0
+        null_mut()
     } else {
-        tokens[map[key].back.unwrap()].addr()
+        tokens[map[key].back.unwrap()].ptr()
     };
 
     tokens[key].cond(next, child, back, map[key].first_child)
@@ -535,6 +550,7 @@ tokenized_state_machine!(LinkSystem<T: Token>{
                 .insert(next, LinkedNode { back: Some(inserted), first_child: false, ..next_node});
 
             require pre.state == SysState::InsertChild { inserted, parent, next: LinkState::Taken(next) };
+            require token.ptr() == pre.all_tokens[next].ptr();
             require token.addr() == pre.all_tokens[next].addr();
             require token_invariant(new_map, pre.all_tokens.insert(next, token), next);
 
@@ -566,6 +582,7 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             let parent_node = pre.map[parent];
             let new_map = pre.map.insert(parent, LinkedNode { child: Some(inserted), ..parent_node });
 
+            require p.ptr() == pre.all_tokens[parent].ptr();
             require p.addr() == pre.all_tokens[parent].addr();
             require token_invariant(new_map, pre.all_tokens.insert(parent, p), parent);
             require match pre.state {
@@ -696,6 +713,7 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             };
 
             let new_map = pre.map.insert(back, new_back);
+            require t.ptr() == pre.all_tokens[back].ptr();
             require t.addr() == pre.all_tokens[back].addr();
             require token_invariant(new_map, pre.all_tokens.insert(back, t), back);
             assert(revoke_back_fixed(new_map, key));
@@ -768,6 +786,7 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             };
 
             let new_map = pre.map.insert(next, new_next);
+            require t.ptr() == pre.all_tokens[next].ptr();
             require t.addr() == pre.all_tokens[next].addr();
             require token_invariant(new_map, pre.all_tokens.insert(next, t), next);
             assert(revoke_next_fixed(new_map, key));
