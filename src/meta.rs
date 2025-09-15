@@ -304,11 +304,11 @@ impl Meta {
             // for well-formedness: show tokens and physical addresses agree
             assert forall|key: CapKey| #[trigger] self.table@.contains_key(key)
             implies {
-                &&& self.tokens@.value()[key].addr() == self.table@[key].addr()
+                &&& self.tokens@.value()[key].ptr() == self.table@[key]
                 &&& self.get(key).key == key
             }
             by {
-                assert(self.tokens@.value()[key].addr() == self.table@[key].addr());
+                assert(self.tokens@.value()[key].ptr() == self.table@[key]);
             };
             assert(self.wf());
 
@@ -420,11 +420,11 @@ impl Meta {
             // for well-formedness: show tokens and physical addresses agree
             assert forall|key: CapKey| #[trigger] self.table@.contains_key(key)
             implies {
-                &&& self.tokens@.value()[key].addr() == self.table@[key].addr()
+                &&& self.tokens@.value()[key].ptr() == self.table@[key]
                 &&& self.get(key).key == key
             }
             by {
-                assert(self.tokens@.value()[key].addr() == self.table@[key].addr());
+                assert(self.tokens@.value()[key].ptr() == self.table@[key]);
             };
 
             assert(self.dom() == old(self).dom().remove(key));

@@ -157,10 +157,6 @@ pub trait Token: Sized {
 
     spec fn ptr(&self) -> *mut Self::Inner;
 
-    open spec fn addr(&self) -> usize {
-        self.ptr()@.addr
-    }
-
     proof fn is_nonnull(tracked &self)
         ensures
             self.ptr()@.addr != 0,
@@ -351,12 +347,6 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     }
 
     #[invariant]
-    pub fn addr_nonnull(&self) -> bool {
-        forall |key: CapKey| self.map.contains_key(key) ==>
-            #[trigger] self.all_tokens[key].addr() != 0
-    }
-
-    #[invariant]
     pub fn pos_depth(&self) -> bool {
         self.depth > 0
     }
@@ -371,13 +361,6 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     pub fn next_back_unequal(&self) -> bool {
         forall |key: CapKey| self.map.contains_key(key) ==>
             self.map[key].back.is_none() || #[trigger] self.map[key].next != self.map[key].back
-    }
-
-    property!{
-        addr_nonnull(key: CapKey) {
-            require pre.map.contains_key(key);
-            assert(pre.all_tokens[key].addr() != 0);
-        }
     }
 
     property!{
@@ -403,7 +386,6 @@ tokenized_state_machine!(LinkSystem<T: Token>{
 
             require !pre.map.contains_key(key);
             require token_invariant(pre.map.insert(key, node), pre.all_tokens.insert(key, token), key);
-            require token.addr() != 0;
 
             update map = pre.map.insert(key, node);
             update all_tokens = pre.all_tokens.insert(key, token);
@@ -439,7 +421,6 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             require !pre.map.contains_key(key);
             require pre.map.contains_key(parent);
             require pre.state == SysState::Clean;
-            require t.addr() != 0;
 
             deposit tokens += [key => t];
             withdraw tokens -= [parent => pre.all_tokens[parent]];
@@ -511,11 +492,10 @@ tokenized_state_machine!(LinkSystem<T: Token>{
 
         assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != key
         implies
-            token_invariant(post.map, pre.all_tokens, other) && post.all_tokens[other].addr() != 0
+            token_invariant(post.map, pre.all_tokens, other)
         by {
             assert(post.map[other] == pre.map[other]);
             assert(token_invariant(pre.map, pre.all_tokens, other));
-            assert(pre.all_tokens[other].addr() != 0);
         };
     }
 
@@ -551,7 +531,6 @@ tokenized_state_machine!(LinkSystem<T: Token>{
 
             require pre.state == SysState::InsertChild { inserted, parent, next: LinkState::Taken(next) };
             require token.ptr() == pre.all_tokens[next].ptr();
-            require token.addr() == pre.all_tokens[next].addr();
             require token_invariant(new_map, pre.all_tokens.insert(next, token), next);
 
             deposit tokens += [next => token];
@@ -569,11 +548,10 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
 
         assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != next
-        implies token_invariant(post.map, pre.all_tokens, other) && post.all_tokens[other].addr() != 0
+        implies token_invariant(post.map, pre.all_tokens, other)
         by {
             assert(post.map[other] == pre.map[other]);
             assert(token_invariant(pre.map, pre.all_tokens, other));
-            assert(pre.all_tokens[other].addr() != 0);
         };
     }
 
@@ -583,7 +561,6 @@ tokenized_state_machine!(LinkSystem<T: Token>{
             let new_map = pre.map.insert(parent, LinkedNode { child: Some(inserted), ..parent_node });
 
             require p.ptr() == pre.all_tokens[parent].ptr();
-            require p.addr() == pre.all_tokens[parent].addr();
             require token_invariant(new_map, pre.all_tokens.insert(parent, p), parent);
             require match pre.state {
                 SysState::InsertChild { inserted: i, parent: p, next } => {
@@ -606,11 +583,10 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
 
         assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != parent
-        implies token_invariant(post.map, pre.all_tokens, other) && post.all_tokens[other].addr() != 0
+        implies token_invariant(post.map, pre.all_tokens, other)
         by {
             assert(post.map[other] == pre.map[other]);
             assert(token_invariant(pre.map, pre.all_tokens, other));
-            assert(pre.all_tokens[other].addr() != 0);
         };
     }
 
@@ -714,7 +690,6 @@ tokenized_state_machine!(LinkSystem<T: Token>{
 
             let new_map = pre.map.insert(back, new_back);
             require t.ptr() == pre.all_tokens[back].ptr();
-            require t.addr() == pre.all_tokens[back].addr();
             require token_invariant(new_map, pre.all_tokens.insert(back, t), back);
             assert(revoke_back_fixed(new_map, key));
 
@@ -756,14 +731,10 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         }
 
         assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != back
-        implies {
-            &&& token_invariant(post.map, pre.all_tokens, other)
-            &&& post.all_tokens[other].addr() != 0
-        }
+        implies token_invariant(post.map, pre.all_tokens, other)
         by {
             assert(post.map[other] == pre.map[other]);
             assert(token_invariant(pre.map, pre.all_tokens, other));
-            assert(pre.all_tokens[other].addr() != 0);
         };
     }
 
@@ -787,7 +758,6 @@ tokenized_state_machine!(LinkSystem<T: Token>{
 
             let new_map = pre.map.insert(next, new_next);
             require t.ptr() == pre.all_tokens[next].ptr();
-            require t.addr() == pre.all_tokens[next].addr();
             require token_invariant(new_map, pre.all_tokens.insert(next, t), next);
             assert(revoke_next_fixed(new_map, key));
 
@@ -819,11 +789,10 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         }
 
         assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != next
-        implies token_invariant(post.map, pre.all_tokens, other) && post.all_tokens[other].addr() != 0
+        implies token_invariant(post.map, pre.all_tokens, other)
         by {
             assert(post.map[other] == pre.map[other]);
             assert(token_invariant(pre.map, pre.all_tokens, other));
-            assert(pre.all_tokens[other].addr() != 0);
         };
     }
 
@@ -868,11 +837,10 @@ tokenized_state_machine!(LinkSystem<T: Token>{
         assert(post.back_link());
 
         assert forall |other: CapKey| #[trigger] post.map.contains_key(other) && other != removed
-        implies token_invariant(post.map, pre.all_tokens, other) && post.all_tokens[other].addr() != 0
+        implies token_invariant(post.map, pre.all_tokens, other)
         by {
             assert(post.map[other] == pre.map[other]);
             assert(token_invariant(pre.map, pre.all_tokens, other));
-            assert(pre.all_tokens[other].addr() != 0);
         };
     }
 });
