@@ -2,11 +2,14 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use tuple-section" #-}
-module Sloc where
+module Main where
 
+import Control.Monad (when)
 import Data.Functor
 import Data.List (intercalate, intersperse, isPrefixOf)
 import GHC.TypeLits (Mod)
+import System.Environment (getArgs)
+import System.Exit (exitFailure)
 import Text.Parsec (Parsec, alphaNum, char, count, many1, noneOf, notFollowedBy, parse, try, (<|>))
 import Text.Parsec.Char (string)
 import Text.Parsec.Prim (many)
@@ -30,6 +33,7 @@ data Token
 data TokenTree
   = Region Char [TokenTree]
   | Token Token
+  | Semi
   | NewLine
   | KeepGhost
   deriving (Show, Eq)
@@ -39,6 +43,8 @@ reserved =
   try (string "proof" $> Proof)
     <|> try (string "proof!" $> Proof)
     <|> try (string "spec" $> Spec)
+    <|> try (string "tracked struct" $> Proof)
+    <|> try (string "ghost struct" $> Spec)
     <|> try (string "ghost" $> Ghost)
     <|> try (string "tracked" $> Tracked)
     <|> try (string "assert" $> Assert)
@@ -51,12 +57,12 @@ reserved =
 
 tokenTree :: Parsec String st TokenTree
 tokenTree =
-  (char '(' *> (Region '(' <$> many tokenTree) <* many (char ' ') <* char ')')
-    <|> (char '{' *> (Region '{' <$> many tokenTree) <* many (char ' ') <* char '}')
+  (char '{' *> (Region '{' <$> many tokenTree) <* many (char ' ') <* char '}')
+    <|> (char ';' $> Semi)
     <|> try (many1 (char ' ') *> tokenTree)
     <|> try (Token <$> reserved <* notFollowedBy alphaNum)
     <|> try (string "#[cfg(verus_keep_ghost)]\n" $> KeepGhost)
-    <|> try (many1 (noneOf [' ', '{', '}', '(', ')', '\n']) $> Token Unknown)
+    <|> try (many1 (noneOf [' ', '{', '}', '\n', ';']) $> Token Unknown)
     <|> (char '\n' $> NewLine)
 
 strip :: TokenTree -> [TokenTree] -> [TokenTree]
@@ -86,7 +92,7 @@ consumeMany :: State -> [TokenTree] -> (Counts, State)
 consumeMany m = (`c` m) . foldMap consumeOne
 
 fixBase :: State -> (Counts, State)
-fixBase s = (mempty, S [] (mode s) False)
+fixBase s = (mempty, S [] (mode s) False False)
 
 switchTo :: Mode -> ResetLocation -> Counter
 switchTo m r = C $ \s -> (mempty, s {modeStack = addToStack m r $ modeStack s})
@@ -101,15 +107,15 @@ countMode f = C $ \m -> (f (mode m), m)
 consumeOne :: TokenTree -> Counter
 consumeOne NewLine = countMode uppies <> C resetTo
 consumeOne (Token Proof) = switchTo MProof AfterCurly
-consumeOne (Token Tracked) = switchTo MProof AtNewline
-consumeOne (Token Assert) = switchTo MProof AtNewline
+consumeOne (Token Tracked) = switchTo MProof AfterSemi
+consumeOne (Token Assert) = switchTo MProof AfterSemi
 consumeOne (Token Spec) = switchTo MSpec AfterCurly
-consumeOne (Token Ghost) = switchTo MSpec AtNewline
+consumeOne (Token Ghost) = switchTo MSpec AfterSemi
 consumeOne (Token Clause) = switchTo MSpec AtCurly
+consumeOne Semi = C encounteringSemi
 consumeOne (Region '{' tt) =
   C encounteringCurly
     <> ignoreState (C fixBase <> C (`consumeMany` tt))
-consumeOne (Region _ tt) = C (`consumeMany` tt)
 consumeOne (Token _) = mempty
 consumeOne KeepGhost =
   switchTo MSpec AtNewline
@@ -123,26 +129,31 @@ uppies MProof = Counts 0 1 0
 uppies MSpec = Counts 1 0 0
 
 mode :: State -> Mode
-mode (S ((m, _) : _) _ _) = m
-mode (S [] b _) = b
+mode (S ((m, _) : _) _ _ _) = m
+mode (S [] b _ _) = b
 
 encounteringCurly :: State -> (Counts, State)
-encounteringCurly (S ((_, AtCurly) : r) m _) =
-  (mempty, S r m True)
+encounteringCurly (S ((_, AtCurly) : r) m _ semi) =
+  (mempty, S r m True semi)
 encounteringCurly s = (mempty, s {encounteredCurly = True})
 
-resetTo :: State -> (Counts, State)
-resetTo s@(S ((_, AtCurly) : _) _ _) = (mempty, s)
-resetTo s@(S ((_, AfterCurly) : _) _ False) = (mempty, s)
-resetTo (S (_ : st) m b) = (mempty, S st m False)
-resetTo (S [] m b) = (mempty, S [] m False)
+encounteringSemi :: State -> (Counts, State)
+encounteringSemi s = (mempty, s {encounteredSemi = True})
 
-data ResetLocation = AtCurly | AfterCurly | AtNewline deriving (Show)
+resetTo :: State -> (Counts, State)
+resetTo s@(S ((_, AtCurly) : _) _ _ _) = (mempty, s)
+resetTo s@(S ((_, AfterCurly) : _) _ False _) = (mempty, s)
+resetTo s@(S ((_, AfterSemi) : _) _ _ False) = (mempty, s)
+resetTo (S (_ : st) m b _) = (mempty, S st m False False)
+resetTo (S [] m b _) = (mempty, S [] m False False)
+
+data ResetLocation = AtCurly | AfterCurly | AfterSemi | AtNewline deriving (Show)
 
 data State = S
   { modeStack :: [(Mode, ResetLocation)],
     base :: Mode,
-    encounteredCurly :: Bool
+    encounteredCurly :: Bool,
+    encounteredSemi :: Bool
   }
   deriving (Show)
 
@@ -156,3 +167,27 @@ instance Semigroup Counter where
 
 instance Monoid Counter where
   mempty = C $ \m -> (mempty, m)
+
+pipeline :: String -> [TokenTree]
+pipeline = either undefined id . parse (many tokenTree) "" . stripEmpty . stripComments
+
+defaultState :: State
+defaultState = S [] MNormal False False
+
+results :: FilePath -> IO Counts
+results file = do
+  file <- readFile file
+  let tokens = pipeline file
+  return . fst $ consumeMany defaultState tokens
+
+usage = "Usage: \n\t sloc PATH"
+
+main = do
+  args <- getArgs
+  when
+    (length args /= 1)
+    (putStrLn usage >> exitFailure)
+  result <- results (head args)
+  putStr (head args)
+  putStr ": "
+  print result
