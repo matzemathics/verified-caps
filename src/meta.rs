@@ -12,7 +12,6 @@
 use std::{borrow::Borrow, ptr::null_mut};
 
 use vstd::{
-    layout::{layout_for_type_is_valid, valid_layout},
     prelude::*,
     raw_ptr::{self, allocate, deallocate, ptr_mut_read, ptr_mut_write, ptr_ref},
 };
@@ -20,7 +19,10 @@ use vstd::{
 verus! {
 
 #[cfg(verus_keep_ghost)]
-use vstd::set_lib::lemma_len_subset;
+use vstd::{
+    set_lib::lemma_len_subset,
+    layout::{layout_for_type_is_valid, valid_layout},
+};
 
 #[cfg(verus_keep_ghost)]
 use crate::{
@@ -176,6 +178,7 @@ impl Meta {
             key
         };
 
+        #[cfg(verus_keep_ghost)]
         layout_for_type_is_valid::<Node>();
         let (ptr, Tracked(mut pt), Tracked(dealloc)) = allocate(size_of::<Node>(), align_of::<Node>());
         let tracked pt = pt.into_typed::<Node>(ptr@.addr);
@@ -219,6 +222,7 @@ impl Meta {
 
         let node = Node { key: child, next, child: null_mut(), back: parent_ptr, first_child: true };
 
+        #[cfg(verus_keep_ghost)]
         layout_for_type_is_valid::<Node>();
         let (ptr, Tracked(mut pt), Tracked(dealloc)) = allocate(size_of::<Node>(), align_of::<Node>());
         let tracked pt = pt.into_typed::<Node>(ptr@.addr);

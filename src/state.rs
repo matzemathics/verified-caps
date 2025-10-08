@@ -7,6 +7,7 @@ use std::ptr::null_mut;
 
 use verus_state_machines_macros::tokenized_state_machine;
 use vstd::prelude::*;
+#[cfg(verus_keep_ghost)]
 use vstd::raw_ptr::ptr_null_mut;
 
 verus! {
@@ -51,7 +52,7 @@ impl LinkState {
 }
 
 #[allow(inconsistent_fields)]
-pub enum SysState {
+pub ghost enum SysState {
     Clean,
     InsertChild { inserted: CapKey, parent: CapKey, next: LinkState },
     RevokeSingle { key: CapKey, back: LinkState, next: LinkState, first_child: bool },
