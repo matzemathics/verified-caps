@@ -84,7 +84,7 @@ instance Semigroup Counts where
 instance Monoid Counts where
   mempty = Counts 0 0 0
 
-data Mode = MNormal | MProof | MSpec deriving (Show)
+data Mode = MNormal | MProof | MSpec deriving (Show, Eq)
 
 data Switch = Switch Int Mode deriving (Show)
 
@@ -99,6 +99,7 @@ switchTo m r = C $ \s -> (mempty, s {modeStack = addToStack m r $ modeStack s})
 
 addToStack :: Mode -> ResetLocation -> [(Mode, ResetLocation)] -> [(Mode, ResetLocation)]
 addToStack m AtCurly ((_, AtCurly) : s) = (m, AtCurly) : s
+addToStack m _ s@((m', r) : _) | m == m' = s
 addToStack m r s = (m, r) : s
 
 countMode :: (Mode -> Counts) -> Counter

@@ -33,17 +33,6 @@ impl<K: View + Eq + Hash, V> View for MutMap<K, V> {
 }
 
 impl<Key: View + Eq + Hash, Value> MutMap<Key, Value> {
-    pub proof fn tracked_borrow(tracked &self) -> (tracked r: &Map<
-        Key::V,
-        PointsTo<Value>,
-    >)
-        ensures
-            r.map_values(|pt: PointsTo<Value>| (pt.id(), pt.mem_contents()))
-                == self@,
-    {
-        self.credits.borrow()
-    }
-
     pub open spec fn wf(self) -> bool {
         self.vacated(Set::empty())
     }
@@ -322,6 +311,13 @@ impl<Key: View + Eq + Hash, Value> MutMap<Key, Value> {
                 assert(old(self).credits@[k] == self.credits@[k]);
             };
         };
+    }
+
+    pub proof fn tracked_borrow(tracked &self) -> (tracked r: &Map<Key::V, PointsTo<Value>>)
+        ensures
+            r.map_values(|pt: PointsTo<Value>| (pt.id(), pt.mem_contents())) == self@,
+    {
+        self.credits.borrow()
     }
 }
 
