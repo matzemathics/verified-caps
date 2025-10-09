@@ -1,4 +1,5 @@
 /target
+/results
 .verus-log
 .verus-solver-log
 **/dist-newstyle
