@@ -135,22 +135,16 @@ pub proof fn lemma_siblings_unchanged_after(pre: LinkMap, post: LinkMap, key: Ca
         lemma_siblings_unfold(post, next);
         assert(decreasing_condition::<Next>(pre, next));
 
-        assert forall|sib: CapKey| #[trigger]
-            siblings(pre, Some(next)).contains(sib) implies pre[sib].next == post[sib].next by {
-            lemma_siblings_contained(pre, Some(next), sib);
-            assert(siblings(pre, Some(next)) == siblings(pre, pre[next].next).push(next));
-            if siblings(pre, pre[key].next).contains(sib) {
-                let index = choose|i: int|
-                    0 <= i < siblings(pre, pre[key].next).len() && siblings(pre, pre[key].next)[i]
-                        == sib;
-                assert(siblings(pre, Some(key)) == siblings(pre, pre[key].next).push(key));
-                assert(siblings(pre, Some(key))[index] == sib);
-                assert(siblings(pre, Some(key)).contains(sib));
-            } else {
-                assert(sib != next);
-                assert(!siblings(pre, pre[next].next).push(next).contains(sib));
-                assert(false);
-            }
+        assert forall|sib: CapKey| #[trigger] siblings(pre, Some(next)).contains(sib)
+            implies pre[sib].next == post[sib].next
+        by {
+            let index = choose|i: int| {
+                &&& 0 <= i < siblings(pre, pre[key].next).len()
+                &&& siblings(pre, pre[key].next)[i] == sib
+            };
+
+            assert(siblings(pre, Some(key))[index] == sib);
+            assert(siblings(pre, Some(key)).contains(sib));
         };
 
         lemma_siblings_unchanged_after(pre, post, next);
