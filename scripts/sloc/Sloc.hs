@@ -62,6 +62,7 @@ tokenTree =
     <|> try (many1 (char ' ') *> tokenTree)
     <|> try (Token <$> reserved <* notFollowedBy alphaNum)
     <|> try (string "#[cfg(verus_keep_ghost)]\n" $> KeepGhost)
+    <|> try (string "#[invariant]\n" $> KeepGhost)
     <|> try (many1 (noneOf [' ', '{', '}', '\n', ';']) $> Token Unknown)
     <|> (char '\n' $> NewLine)
 
