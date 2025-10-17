@@ -47,7 +47,7 @@ use crate::{
 };
 
 use crate::{
-    specs::cap_map::{ActId, CapKey},
+    specs::cap_map::{ActId, CapId, CapKey},
     state::{LinkSystem, Token},
     tables::{HashMetaCapTable, MetaCapTable},
 };
@@ -56,11 +56,25 @@ struct Node {
     next: *mut Node,
     child: *mut Node,
     back: *mut Node,
+    id: CapId,
+    activity: ActId,
     first_child: bool,
-    key: CapKey,
 }
 
-global layout Node is size == 48, align == 8;
+impl Node {
+    spec fn key_spec(&self) -> CapKey {
+        (self.activity, self.id)
+    }
+
+    #[verifier::when_used_as_spec(key_spec)]
+    fn key(&self) -> CapKey
+    returns self.key()
+    {
+        (self.activity, self.id)
+    }
+}
+
+global layout Node is size == 40, align == 8;
 
 tracked struct NodePerm {
     pt: raw_ptr::PointsTo<Node>,
@@ -155,7 +169,7 @@ impl Meta {
         &&& self.dom() == self.table@.dom()
         &&& forall|key: CapKey| self.table@.contains_key(key) ==> {
             &&& #[trigger] self.tokens@.value()[key].ptr() == self.table@[key]
-            &&& self.get(key).key == key
+            &&& self.get(key).key() == key
         }
     }
 
@@ -175,7 +189,8 @@ impl Meta {
             child: null_mut(),
             back: null_mut(),
             first_child: false,
-            key
+            activity: key.0,
+            id: key.1
         };
 
         #[cfg(verus_keep_ghost)]
@@ -220,7 +235,14 @@ impl Meta {
         let parent_ptr = *self.table.get(parent).unwrap();
         let next = self.borrow_node(parent).child;
 
-        let node = Node { key: child, next, child: null_mut(), back: parent_ptr, first_child: true };
+        let node = Node {
+            activity: child.0,
+            id: child.1,
+            next,
+            child: null_mut(),
+            back: parent_ptr,
+            first_child: true
+        };
 
         #[cfg(verus_keep_ghost)]
         layout_for_type_is_valid::<Node>();
@@ -309,7 +331,7 @@ impl Meta {
             assert forall|key: CapKey| #[trigger] self.table@.contains_key(key)
             implies {
                 &&& self.tokens@.value()[key].ptr() == self.table@[key]
-                &&& self.get(key).key == key
+                &&& self.get(key).key() == key
             }
             by {
                 assert(self.tokens@.value()[key].ptr() == self.table@[key]);
@@ -425,7 +447,7 @@ impl Meta {
             assert forall|key: CapKey| #[trigger] self.table@.contains_key(key)
             implies {
                 &&& self.tokens@.value()[key].ptr() == self.table@[key]
-                &&& self.get(key).key == key
+                &&& self.get(key).key() == key
             }
             by {
                 assert(self.tokens@.value()[key].ptr() == self.table@[key]);
@@ -476,7 +498,7 @@ impl Meta {
             let child = self.first_child(key);
             let tracked _ = self.lemma_child_null_imp_none(child);
 
-            if child.key.0 == key.0 && child.key.1 == key.1 {
+            if child.activity == key.0 && child.id == key.1 {
                 break
             }
 
@@ -488,29 +510,29 @@ impl Meta {
 
             let ghost pre = self.spec();
             assert(self@ == view(pre));
-            self.revoke_single(child.key);
+            self.revoke_single(child.key());
             assert(view(pre).dom() == pre.dom());
-            assert(self.dom() == pre.dom().remove(child.key));
+            assert(self.dom() == pre.dom().remove(child.key()));
 
             let tracked _ = {
                 self.instance.borrow().weak_connections(self.spec.borrow());
                 lemma_view_acyclic(self.spec());
-                lemma_revoke_transitive_changes(pre, child.key, key);
-                lemma_revoke_transitive_non_changes(pre, child.key, key, subtree);
+                lemma_revoke_transitive_changes(pre, child.key(), key);
+                lemma_revoke_transitive_non_changes(pre, child.key(), key, subtree);
 
-                revoked_keys = revoked_keys.insert(child.key);
+                revoked_keys = revoked_keys.insert(child.key());
                 assert(old(self).dom() == self.dom().union(revoked_keys));
 
                 assert(subtree == transitive_children(view(self.spec()), key).union(revoked_keys));
-                assert(subtree.contains(child.key));
+                assert(subtree.contains(child.key()));
 
-                if let Some(parent) = get_parent(view(self.spec()), child.key) {
-                    assert(transitive_child_of(view(pre), child.key, key));
+                if let Some(parent) = get_parent(view(self.spec()), child.key()) {
+                    assert(transitive_child_of(view(pre), child.key(), key));
                     lemma_view_tree_ish(pre);
-                    lemma_transitive_child_parent(view(pre), key, parent, child.key);
-                    lemma_depth_increase(view(pre), parent, child.key);
+                    lemma_transitive_child_parent(view(pre), key, parent, child.key());
+                    lemma_depth_increase(view(pre), parent, child.key());
                     assert(transitive_child_of(view(pre), parent, parent));
-                    lemma_still_transitive_child(view(pre), key, parent, child.key);
+                    lemma_still_transitive_child(view(pre), key, parent, child.key());
                     assert(transitive_child_of(view(self.spec()), parent, key));
                 }
 
@@ -555,7 +577,7 @@ impl Meta {
         ensures
             self.get(key) == res,
             self.contains(res),
-            res.key == key,
+            res.key() == key,
     {
         let ptr = self.table.get(key).unwrap();
         let tracked borrow = self.instance.borrow().borrow_token(
@@ -566,13 +588,13 @@ impl Meta {
         );
         assert(ptr == borrow.ptr());
         let tracked _ = borrow.is_init();
-        assert(borrow.pt.value().key == key);
+        assert(borrow.pt.value().key() == key);
         ptr_ref(*ptr as *const _, Tracked(&borrow.pt))
     }
 
     spec fn contains(&self, node: &Node) -> bool {
-        &&& self@.contains_key(node.key)
-        &&& self.get(node.key) == node
+        &&& self@.contains_key(node.key())
+        &&& self.get(node.key()) == node
     }
 
     spec fn get(&self, key: CapKey) -> Node {
@@ -594,34 +616,34 @@ impl Meta {
         ensures
             res.child@.addr == 0,
             self.contains(res),
-            transitive_child_of(view(self.spec()), res.key, parent),
+            transitive_child_of(view(self.spec()), res.key(), parent),
     {
         let mut res = self.borrow_node(parent);
         let tracked _ = self.instance.borrow().weak_connections(self.spec.borrow());
         let tracked _ = lemma_view_acyclic(self.spec());
-        assert(transitive_child_of(view(self.spec()), res.key, parent));
+        assert(transitive_child_of(view(self.spec()), res.key(), parent));
 
         while res.child as usize != 0
             invariant
                 self.wf(),
                 self@.contains_key(parent),
                 self.contains(res),
-                transitive_child_of(view(self.spec()), res.key, parent),
+                transitive_child_of(view(self.spec()), res.key(), parent),
             decreases
-                self.generation@.value() - self.spec()[res.key].depth
+                self.generation@.value() - self.spec()[res.key()].depth
         {
             let tracked token = {
-                self.instance.borrow().contains_child(res.key, self.spec.borrow());
-                self.instance.borrow().token_invariant(res.key, self.spec.borrow(), self.tokens.borrow());
-                let ghost next = self.spec()[res.key].child.unwrap();
+                self.instance.borrow().contains_child(res.key(), self.spec.borrow());
+                self.instance.borrow().token_invariant(res.key(), self.spec.borrow(), self.tokens.borrow());
+                let ghost next = self.spec()[res.key()].child.unwrap();
 
                 self.instance.borrow().weak_connections(self.spec.borrow());
                 lemma_siblings_unfold(self.spec(), next);
-                assert(self.spec()[res.key].depth < self.spec()[next].depth) by {
-                    assert(decreasing_condition::<Child>(self.spec(), res.key));
+                assert(self.spec()[res.key()].depth < self.spec()[next].depth) by {
+                    assert(decreasing_condition::<Child>(self.spec(), res.key()));
                 };
                 assert(siblings(self.spec(), Some(next)).last() == next);
-                assert(view(self.spec())[res.key].children.contains(next));
+                assert(view(self.spec())[res.key()].children.contains(next));
                 self.instance.borrow().depth_bound(next, self.spec.borrow(), self.generation.borrow());
 
                 lemma_view_acyclic(self.spec());
@@ -688,16 +710,16 @@ impl Meta {
             self.contains(node),
             self.ties(),
         ensures
-            self.spec()[node.key].next.is_none(),
+            self.spec()[node.key()].next.is_none(),
     {
-        let next_key = self.spec()[node.key].next;
+        let next_key = self.spec()[node.key()].next;
         if next_key.is_some() {
             self.instance.borrow().token_invariant(
-                node.key,
+                node.key(),
                 self.spec.borrow(),
                 self.tokens.borrow(),
             );
-            self.instance.borrow().contains_next(node.key, self.spec.borrow());
+            self.instance.borrow().contains_next(node.key(), self.spec.borrow());
             self.instance.borrow().token_invariant(
                 next_key.unwrap(),
                 self.spec.borrow(),
@@ -713,17 +735,17 @@ impl Meta {
             self.contains(node),
             self.ties(),
         ensures
-            self.spec()[node.key].child.is_none(),
+            self.spec()[node.key()].child.is_none(),
     {
         // prove that key.child == None in this case
-        let child_key = self.spec()[node.key].child;
+        let child_key = self.spec()[node.key()].child;
         if child_key.is_some() {
             self.instance.borrow().token_invariant(
-                node.key,
+                node.key(),
                 self.spec.borrow(),
                 self.tokens.borrow(),
             );
-            self.instance.borrow().contains_child(node.key, self.spec.borrow());
+            self.instance.borrow().contains_child(node.key(), self.spec.borrow());
             self.instance.borrow().token_invariant(
                 child_key.unwrap(),
                 self.spec.borrow(),
@@ -739,17 +761,17 @@ impl Meta {
             self.contains(node),
             self.ties(),
         ensures
-            self.spec()[node.key].back.is_none(),
+            self.spec()[node.key()].back.is_none(),
     {
         // prove that key.back == None in this case
-        let back_key = self.spec()[node.key].back;
+        let back_key = self.spec()[node.key()].back;
         if back_key.is_some() {
             self.instance.borrow().token_invariant(
-                node.key,
+                node.key(),
                 self.spec.borrow(),
                 self.tokens.borrow(),
             );
-            self.instance.borrow().contains_back(node.key, self.spec.borrow());
+            self.instance.borrow().contains_back(node.key(), self.spec.borrow());
             self.instance.borrow().token_invariant(
                 back_key.unwrap(),
                 self.spec.borrow(),
