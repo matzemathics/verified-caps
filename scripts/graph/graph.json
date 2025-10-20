@@ -1,386 +1,385 @@
-{
-    "simple_example::state::LinkSystem::show::insert_root": 4,
-    "simple_example::state::LinkSystem::show::insert_child": 4,
-    "simple_example::state::LinkSystem::show::insert_child_fix_next": 4,
-    "simple_example::state::LinkSystem::show::insert_child_finish_next": 4,
-    "simple_example::state::LinkSystem::show::finish_insert": 4,
-    "simple_example::state::LinkSystem::show::revoke_single": 4,
-    "simple_example::state::LinkSystem::show::revoke_take_back": 4,
-    "simple_example::state::LinkSystem::show::revoke_take_next": 4,
-    "simple_example::state::LinkSystem::show::revoke_put_back": 4,
-    "simple_example::state::LinkSystem::show::revoke_put_next": 4,
-    "simple_example::state::LinkSystem::show::finish_revoke_single": 4,
-    "simple_example::state::LinkSystem::show::empty": 4,
-    "simple_example::specs::link_map::MonotonicFunction::apply": 1,
-    "simple_example::specs::link_map::MonotonicFunction::condition": 1,
-    "simple_example::state::LinkSystem::impl&%5::instance_id": 4,
-    "simple_example::state::LinkSystem::impl&%5::value": 4,
-    "simple_example::state::LinkSystem::impl&%5::agree": 4,
-    "simple_example::state::LinkSystem::impl&%5::arbitrary": 4,
-    "simple_example::state::LinkSystem::impl&%6::unique": 4,
-    "simple_example::state::LinkSystem::impl&%8::instance_id": 4,
-    "simple_example::state::LinkSystem::impl&%8::value": 4,
-    "simple_example::state::LinkSystem::impl&%8::agree": 4,
-    "simple_example::state::LinkSystem::impl&%8::arbitrary": 4,
-    "simple_example::state::LinkSystem::impl&%9::unique": 4,
-    "simple_example::state::LinkSystem::impl&%11::instance_id": 4,
-    "simple_example::state::LinkSystem::impl&%11::value": 4,
-    "simple_example::state::LinkSystem::impl&%11::agree": 4,
-    "simple_example::state::LinkSystem::impl&%11::arbitrary": 4,
-    "simple_example::state::LinkSystem::impl&%12::unique": 4,
-    "simple_example::state::LinkSystem::impl&%14::instance_id": 4,
-    "simple_example::state::LinkSystem::impl&%14::value": 4,
-    "simple_example::state::LinkSystem::impl&%14::agree": 4,
-    "simple_example::state::LinkSystem::impl&%14::arbitrary": 4,
-    "simple_example::state::LinkSystem::impl&%15::unique": 4,
-    "simple_example::state::LinkSystem::impl&%16::id": 2,
-    "simple_example::state::LinkSystem::impl&%19::lemma_msg_state_tokens_disjoint": 3,
-    "simple_example::state::LinkSystem::impl&%19::lemma_msg_token_invariant": 3,
-    "simple_example::state::LinkSystem::impl&%19::lemma_msg_map_tokens": 3,
-    "simple_example::state::LinkSystem::impl&%19::lemma_msg_link_conditions": 3,
-    "simple_example::state::LinkSystem::impl&%19::lemma_msg_token_value": 3,
-    "simple_example::state::LinkSystem::impl&%19::lemma_msg_pos_depth": 3,
-    "simple_example::state::LinkSystem::impl&%19::lemma_msg_depth_bound": 3,
-    "simple_example::state::LinkSystem::impl&%19::lemma_msg_state_inv": 3,
-    "simple_example::meta::VERUS_layout_of_Node": 3,
-    "simple_example::state::Token::ptr": 1,
-    "simple_example::state::Token::is_nonnull": 4,
-    "simple_example::state::Token::cond": 1,
-    "simple_example::tables::MetaCapTable::insert": 9,
-    "simple_example::tables::MetaCapTable::remove": 9,
-    "simple_example::tables::MetaCapTable::get": 14,
-    "simple_example::tables::MetaCapTable::wf": 2,
-    "simple_example::tables::MetaCapTable::get_act_table": 7,
-    "simple_example::lemmas::common::ith_predecessor": 4,
-    "simple_example::lemmas::common::predecessor": 2,
-    "simple_example::lemmas::insert_view::impl&%0::insert_node": 3,
-    "simple_example::lemmas::insert_view::impl&%0::insert_view_node": 2,
-    "simple_example::lemmas::insert_view::impl&%0::child_update": 3,
-    "simple_example::lemmas::insert_view::impl&%0::next_update": 5,
-    "simple_example::lemmas::insert_view::impl&%0::update": 4,
-    "simple_example::lemmas::insert_view::impl&%0::parent_update": 3,
-    "simple_example::lemmas::insert_view::impl&%0::invariants": 5,
-    "simple_example::lemmas::revoke_view::close_to": 2,
-    "simple_example::lemmas::revoke_view::revoke_back_update": 3,
-    "simple_example::lemmas::revoke_view::revoke_next_update": 3,
-    "simple_example::specs::cap_map::get_parent": 2,
-    "simple_example::specs::cap_map::edge": 4,
-    "simple_example::specs::cap_map::sibling_of": 2,
-    "simple_example::specs::cap_map::depth_fn": 4,
-    "simple_example::specs::cap_map::depth": 2,
-    "simple_example::specs::cap_map::acyclic": 2,
-    "simple_example::specs::cap_map::tree_ish": 5,
-    "simple_example::specs::cap_map::parents": 3,
-    "simple_example::specs::cap_map::transitive_child_of": 8,
-    "simple_example::specs::cap_map::transitive_children": 4,
-    "simple_example::specs::cap_map::insert_child": 5,
-    "simple_example::specs::cap_map::revoke_single_parent_update": 5,
-    "simple_example::specs::link_map::view": 3,
-    "simple_example::specs::link_map::impl&%0::to_spec": 2,
-    "simple_example::specs::link_map::impl&%1::apply": 3,
-    "simple_example::specs::link_map::impl&%1::condition": 3,
-    "simple_example::specs::link_map::impl&%2::apply": 3,
-    "simple_example::specs::link_map::impl&%2::condition": 3,
-    "simple_example::specs::link_map::decreasing_condition": 6,
-    "simple_example::specs::link_map::siblings": 13,
-    "simple_example::specs::link_map::next_index": 4,
-    "simple_example::specs::link_map::decreasing": 4,
-    "simple_example::tables::cell_map::impl&%0::view": 8,
-    "simple_example::tables::cell_map::impl&%1::wf": 6,
-    "simple_example::tables::cell_map::impl&%1::vacated": 7,
-    "simple_example::tables::cell_map::impl&%1::addrs_match": 6,
-    "simple_example::tables::cell_map::impl&%1::init_besides": 8,
-    "simple_example::tables::cell_map::impl&%1::uninit_vacated": 8,
-    "simple_example::tables::cell_map::impl&%1::credit_addrs": 6,
-    "simple_example::tables::cell_map::impl&%1::map_addrs": 8,
-    "simple_example::tables::cell_map::impl&%1::index_opt": 9,
-    "simple_example::state::LinkSystem::impl&%0::arrow_0": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_3": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_insert_root_0": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_insert_root_1": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_insert_child_0": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_insert_child_1": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_insert_child_2": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_insert_child_fix_next_0": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_insert_child_fix_next_1": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_insert_child_finish_next_0": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_insert_child_finish_next_1": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_insert_child_finish_next_2": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_insert_child_finish_next_3": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_finish_insert_0": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_finish_insert_1": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_finish_insert_2": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_revoke_single_0": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_revoke_put_back_0": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_revoke_put_next_0": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_finish_revoke_single_0": 2,
-    "simple_example::state::LinkSystem::impl&%0::arrow_dummy_to_use_type_params_0": 2,
-    "simple_example::state::LinkSystem::impl&%1::is_insert_root": 2,
-    "simple_example::state::LinkSystem::impl&%1::get_insert_root_0": 2,
-    "simple_example::state::LinkSystem::impl&%1::get_insert_root_1": 2,
-    "simple_example::state::LinkSystem::impl&%1::is_insert_child": 2,
-    "simple_example::state::LinkSystem::impl&%1::get_insert_child_0": 2,
-    "simple_example::state::LinkSystem::impl&%1::get_insert_child_1": 2,
-    "simple_example::state::LinkSystem::impl&%1::get_insert_child_2": 2,
-    "simple_example::state::LinkSystem::impl&%1::is_insert_child_fix_next": 2,
-    "simple_example::state::LinkSystem::impl&%1::get_insert_child_fix_next_0": 2,
-    "simple_example::state::LinkSystem::impl&%1::get_insert_child_fix_next_1": 2,
-    "simple_example::state::LinkSystem::impl&%1::is_insert_child_finish_next": 2,
-    "simple_example::state::LinkSystem::impl&%1::get_insert_child_finish_next_0": 2,
-    "simple_example::state::LinkSystem::impl&%1::get_insert_child_finish_next_1": 2,
-    "simple_example::state::LinkSystem::impl&%1::get_insert_child_finish_next_2": 2,
-    "simple_example::state::LinkSystem::impl&%1::get_insert_child_finish_next_3": 2,
-    "simple_example::state::LinkSystem::impl&%1::is_finish_insert": 2,
-    "simple_example::state::LinkSystem::impl&%1::get_finish_insert_0": 2,
-    "simple_example::state::LinkSystem::impl&%1::get_finish_insert_1": 2,
-    "simple_example::state::LinkSystem::impl&%1::get_finish_insert_2": 2,
-    "simple_example::state::LinkSystem::impl&%1::is_revoke_single": 2,
-    "simple_example::state::LinkSystem::impl&%1::get_revoke_single_0": 2,
-    "simple_example::state::LinkSystem::impl&%1::is_revoke_take_back": 2,
-    "simple_example::state::LinkSystem::impl&%1::is_revoke_take_next": 2,
-    "simple_example::state::LinkSystem::impl&%1::is_revoke_put_back": 2,
-    "simple_example::state::LinkSystem::impl&%1::get_revoke_put_back_0": 2,
-    "simple_example::state::LinkSystem::impl&%1::is_revoke_put_next": 2,
-    "simple_example::state::LinkSystem::impl&%1::get_revoke_put_next_0": 2,
-    "simple_example::state::LinkSystem::impl&%1::is_finish_revoke_single": 2,
-    "simple_example::state::LinkSystem::impl&%1::get_finish_revoke_single_0": 2,
-    "simple_example::state::LinkSystem::impl&%1::is_dummy_to_use_type_params": 2,
-    "simple_example::state::LinkSystem::impl&%1::get_dummy_to_use_type_params_0": 2,
-    "simple_example::state::LinkSystem::impl&%2::arrow_0": 2,
-    "simple_example::state::LinkSystem::impl&%2::arrow_dummy_to_use_type_params_0": 2,
-    "simple_example::state::LinkSystem::impl&%3::is_empty": 2,
-    "simple_example::state::LinkSystem::impl&%3::is_dummy_to_use_type_params": 2,
-    "simple_example::state::LinkSystem::impl&%3::get_dummy_to_use_type_params_0": 2,
-    "simple_example::state::LinkSystem::impl&%19::empty": 3,
-    "simple_example::state::LinkSystem::impl&%19::empty_enabled": 2,
-    "simple_example::state::LinkSystem::impl&%19::insert_root": 7,
-    "simple_example::state::LinkSystem::impl&%19::insert_root_strong": 7,
-    "simple_example::state::LinkSystem::impl&%19::insert_root_enabled": 5,
-    "simple_example::state::LinkSystem::impl&%19::insert_child": 17,
-    "simple_example::state::LinkSystem::impl&%19::insert_child_strong": 17,
-    "simple_example::state::LinkSystem::impl&%19::insert_child_enabled": 7,
-    "simple_example::state::LinkSystem::impl&%19::insert_child_fix_next": 8,
-    "simple_example::state::LinkSystem::impl&%19::insert_child_fix_next_strong": 8,
-    "simple_example::state::LinkSystem::impl&%19::insert_child_fix_next_enabled": 3,
-    "simple_example::state::LinkSystem::impl&%19::insert_child_finish_next": 13,
-    "simple_example::state::LinkSystem::impl&%19::insert_child_finish_next_strong": 11,
-    "simple_example::state::LinkSystem::impl&%19::insert_child_finish_next_enabled": 6,
-    "simple_example::state::LinkSystem::impl&%19::finish_insert": 10,
-    "simple_example::state::LinkSystem::impl&%19::finish_insert_strong": 10,
-    "simple_example::state::LinkSystem::impl&%19::finish_insert_enabled": 7,
-    "simple_example::state::LinkSystem::impl&%19::revoke_single": 7,
-    "simple_example::state::LinkSystem::impl&%19::revoke_single_strong": 7,
-    "simple_example::state::LinkSystem::impl&%19::revoke_single_enabled": 4,
-    "simple_example::state::LinkSystem::impl&%19::revoke_take_back": 11,
-    "simple_example::state::LinkSystem::impl&%19::revoke_take_back_strong": 11,
-    "simple_example::state::LinkSystem::impl&%19::revoke_take_back_enabled": 3,
-    "simple_example::state::LinkSystem::impl&%19::revoke_take_next": 11,
-    "simple_example::state::LinkSystem::impl&%19::revoke_take_next_strong": 11,
-    "simple_example::state::LinkSystem::impl&%19::revoke_take_next_enabled": 3,
-    "simple_example::state::LinkSystem::impl&%19::revoke_put_back": 11,
-    "simple_example::state::LinkSystem::impl&%19::revoke_put_back_strong": 11,
-    "simple_example::state::LinkSystem::impl&%19::revoke_put_back_enabled": 8,
-    "simple_example::state::LinkSystem::impl&%19::revoke_put_next": 11,
-    "simple_example::state::LinkSystem::impl&%19::revoke_put_next_strong": 11,
-    "simple_example::state::LinkSystem::impl&%19::revoke_put_next_enabled": 8,
-    "simple_example::state::LinkSystem::impl&%19::finish_revoke_single": 4,
-    "simple_example::state::LinkSystem::impl&%19::finish_revoke_single_strong": 4,
-    "simple_example::state::LinkSystem::impl&%19::finish_revoke_single_enabled": 3,
-    "simple_example::state::LinkSystem::impl&%19::next_by": 13,
-    "simple_example::state::LinkSystem::impl&%19::next": 3,
-    "simple_example::state::LinkSystem::impl&%19::next_strong_by": 13,
-    "simple_example::state::LinkSystem::impl&%19::next_strong": 3,
-    "simple_example::state::LinkSystem::impl&%19::init_by": 3,
-    "simple_example::state::LinkSystem::impl&%19::init": 3,
-    "simple_example::state::LinkSystem::impl&%19::invariant": 10,
-    "simple_example::state::LinkSystem::impl&%19::state_tokens_disjoint": 5,
-    "simple_example::state::LinkSystem::impl&%19::token_invariant": 4,
-    "simple_example::state::LinkSystem::impl&%19::map_tokens": 5,
-    "simple_example::state::LinkSystem::impl&%19::link_conditions": 3,
-    "simple_example::state::LinkSystem::impl&%19::token_value": 4,
-    "simple_example::state::LinkSystem::impl&%19::pos_depth": 2,
-    "simple_example::state::LinkSystem::impl&%19::depth_bound": 4,
-    "simple_example::state::LinkSystem::impl&%19::state_inv": 11,
-    "simple_example::meta::impl&%0::wf": 11,
-    "simple_example::meta::impl&%0::back": 2,
-    "simple_example::meta::impl&%0::next": 2,
-    "simple_example::meta::impl&%0::child": 2,
-    "simple_example::meta::impl&%0::first_child": 2,
-    "simple_example::meta::impl&%1::ptr": 4,
-    "simple_example::meta::impl&%1::cond": 8,
-    "simple_example::meta::impl&%2::ties": 18,
-    "simple_example::meta::impl&%2::wf": 19,
-    "simple_example::meta::impl&%2::view": 3,
-    "simple_example::meta::impl&%2::contains": 4,
-    "simple_example::meta::impl&%2::get": 6,
-    "simple_example::meta::impl&%2::dom": 3,
-    "simple_example::meta::impl&%2::spec": 4,
-    "simple_example::state::impl&%0::arrow_Unchanged_0": 1,
-    "simple_example::state::impl&%0::arrow_Taken_0": 1,
-    "simple_example::state::impl&%0::arrow_Fixed_0": 1,
-    "simple_example::state::impl&%1::dom": 3,
-    "simple_example::state::impl&%1::fixed": 1,
-    "simple_example::state::impl&%1::key": 1,
-    "simple_example::state::impl&%2::arrow_parent": 1,
-    "simple_example::state::impl&%2::arrow_back": 1,
-    "simple_example::state::impl&%2::arrow_inserted": 1,
-    "simple_example::state::impl&%2::arrow_key": 1,
-    "simple_example::state::impl&%2::arrow_first_child": 1,
-    "simple_example::state::impl&%2::arrow_InsertChild_inserted": 1,
-    "simple_example::state::impl&%2::arrow_InsertChild_parent": 1,
-    "simple_example::state::impl&%2::arrow_InsertChild_next": 1,
-    "simple_example::state::impl&%2::arrow_RevokeSingle_key": 1,
-    "simple_example::state::impl&%2::arrow_RevokeSingle_back": 1,
-    "simple_example::state::impl&%2::arrow_RevokeSingle_next": 1,
-    "simple_example::state::impl&%2::arrow_RevokeSingle_first_child": 1,
-    "simple_example::state::impl&%3::dom": 5,
-    "simple_example::state::impl&%3::allow_broken_back_link": 1,
-    "simple_example::state::impl&%3::allow_broken_next_link": 2,
-    "simple_example::state::impl&%3::allow_broken_child_link": 2,
-    "simple_example::state::back_link_condition": 6,
-    "simple_example::state::next_link_condition": 6,
-    "simple_example::state::child_link_condition": 6,
-    "simple_example::state::token_invariant": 8,
-    "simple_example::state::revoke_back_fixed": 3,
-    "simple_example::state::revoke_next_fixed": 3,
-    "simple_example::state::link_condition": 6,
-    "simple_example::state::clean_links": 2,
-    "simple_example::tables::impl&%0::view": 8,
-    "simple_example::tables::impl&%2::view": 20,
-    "simple_example::tables::impl&%3::wf": 18,
-    "simple_example::state::LinkSystem::take_step::empty": 6,
-    "simple_example::state::LinkSystem::impl&%19::empty_inductive": 15,
-    "simple_example::state::LinkSystem::take_step::insert_root": 7,
-    "simple_example::state::LinkSystem::impl&%19::insert_root_inductive": 15,
-    "simple_example::state::LinkSystem::impl&%19::insert_root_asserts": 9,
-    "simple_example::state::LinkSystem::take_step::insert_child": 7,
-    "simple_example::state::LinkSystem::impl&%19::insert_child_inductive": 16,
-    "simple_example::state::LinkSystem::impl&%19::insert_child_asserts": 21,
-    "simple_example::state::LinkSystem::take_step::insert_child_fix_next": 7,
-    "simple_example::state::LinkSystem::impl&%19::insert_child_fix_next_inductive": 15,
-    "simple_example::state::LinkSystem::impl&%19::insert_child_fix_next_asserts": 11,
-    "simple_example::state::LinkSystem::take_step::insert_child_finish_next": 7,
-    "simple_example::state::LinkSystem::impl&%19::insert_child_finish_next_inductive": 15,
-    "simple_example::state::LinkSystem::impl&%19::insert_child_finish_next_asserts": 14,
-    "simple_example::state::LinkSystem::take_step::finish_insert": 7,
-    "simple_example::state::LinkSystem::impl&%19::finish_insert_inductive": 15,
-    "simple_example::state::LinkSystem::impl&%19::finish_insert_asserts": 13,
-    "simple_example::state::LinkSystem::take_step::revoke_single": 7,
-    "simple_example::state::LinkSystem::impl&%19::revoke_single_inductive": 17,
-    "simple_example::state::LinkSystem::impl&%19::revoke_single_asserts": 10,
-    "simple_example::state::LinkSystem::take_step::revoke_take_back": 7,
-    "simple_example::state::LinkSystem::impl&%19::revoke_take_back_inductive": 15,
-    "simple_example::state::LinkSystem::impl&%19::revoke_take_back_asserts": 14,
-    "simple_example::state::LinkSystem::take_step::revoke_take_next": 7,
-    "simple_example::state::LinkSystem::impl&%19::revoke_take_next_inductive": 15,
-    "simple_example::state::LinkSystem::impl&%19::revoke_take_next_asserts": 14,
-    "simple_example::state::LinkSystem::take_step::revoke_put_back": 7,
-    "simple_example::state::LinkSystem::impl&%19::revoke_put_back_inductive": 15,
-    "simple_example::state::LinkSystem::impl&%19::revoke_put_back_asserts": 14,
-    "simple_example::state::LinkSystem::take_step::revoke_put_next": 7,
-    "simple_example::state::LinkSystem::impl&%19::revoke_put_next_inductive": 15,
-    "simple_example::state::LinkSystem::impl&%19::revoke_put_next_asserts": 14,
-    "simple_example::state::LinkSystem::take_step::finish_revoke_single": 6,
-    "simple_example::state::LinkSystem::impl&%19::finish_revoke_single_inductive": 15,
-    "simple_example::lemmas::common::lemma_siblings_contained": 13,
-    "simple_example::lemmas::common::lemma_siblings_unfold": 9,
-    "simple_example::lemmas::common::lemma_siblings_none_empty": 3,
-    "simple_example::lemmas::common::lemma_siblings_take_n": 16,
-    "simple_example::lemmas::common::lemma_siblings_unchanged": 13,
-    "simple_example::lemmas::common::lemma_siblings_unchanged_after": 18,
-    "simple_example::lemmas::common::lemma_siblings_decreasing": 12,
-    "simple_example::lemmas::common::lemma_siblings_no_loop": 8,
-    "simple_example::lemmas::common::lemma_ith_predecessor_univalent": 11,
-    "simple_example::lemmas::common::lemma_no_predecessor": 12,
-    "simple_example::lemmas::common::lemma_predecessor_transitive": 12,
-    "simple_example::lemmas::common::lemma_child_of_first_child": 15,
-    "simple_example::lemmas::common::lemma_siblings_depth": 12,
-    "simple_example::lemmas::common::lemma_seq_remove_value_contains_a": 7,
-    "simple_example::lemmas::common::lemma_seq_remove_value_contains_b": 8,
-    "simple_example::lemmas::common::lemma_child_of_depth": 11,
-    "simple_example::lemmas::common::lemma_child_of_univalent": 14,
-    "simple_example::lemmas::common::lemma_view_tree_ish": 16,
-    "simple_example::lemmas::common::lemma_parent_child": 9,
-    "simple_example::lemmas::common::lemma_sibling_of_next": 18,
-    "simple_example::lemmas::common::lemma_siblings_unchanged_local": 16,
-    "simple_example::lemmas::common::lemma_sib_back_some": 11,
-    "simple_example::lemmas::common::lemma_view_acyclic": 14,
-    "simple_example::lemmas::common::lemma_is_parent_of": 12,
-    "simple_example::lemmas::common::lemma_depth_increase": 6,
-    "simple_example::lemmas::common::lemma_transitive_children_empty": 11,
-    "simple_example::lemmas::common::lemma_transitive_child_parent": 9,
-    "simple_example::lemmas::common::lemma_transitive_child_extend": 11,
-    "simple_example::lemmas::insert_view::lemma_insert_siblings_unchanged": 17,
-    "simple_example::lemmas::insert_view::impl&%0::lemma_view_child_update": 21,
-    "simple_example::lemmas::insert_view::impl&%0::lemma_view_next_update": 14,
-    "simple_example::lemmas::insert_view::impl&%0::lemma_view_update": 21,
-    "simple_example::lemmas::revoke_view::lemma_siblings_jump": 32,
-    "simple_example::lemmas::revoke_view::lemma_revoke_spec": 40,
-    "simple_example::lemmas::revoke_view::lemma_view_acyclic_post": 17,
-    "simple_example::lemmas::revoke_view::lemma_transitive_changes_forward": 19,
-    "simple_example::lemmas::revoke_view::lemma_transitive_changes_backward": 18,
-    "simple_example::lemmas::revoke_view::lemma_revoke_transitive_changes": 14,
-    "simple_example::lemmas::revoke_view::lemma_revoke_transitive_non_changes": 17,
-    "simple_example::lemmas::revoke_view::lemma_still_transitive_child": 14,
-    "simple_example::specs::cap_map::transitive_child_of_decreases": 6,
-    "simple_example::specs::link_map::siblings_decreases": 3,
-    "simple_example::tables::cell_map::impl&%1::lemma_is_init": 11,
-    "simple_example::tables::cell_map::impl&%1::new": 17,
-    "simple_example::tables::cell_map::impl&%1::contains_key": 11,
-    "simple_example::tables::cell_map::impl&%1::lemma_dom_credits_eq_dom_m": 11,
-    "simple_example::tables::cell_map::impl&%1::insert": 28,
-    "simple_example::tables::cell_map::impl&%1::borrow_perm": 18,
-    "simple_example::tables::cell_map::impl&%1::get": 15,
-    "simple_example::tables::cell_map::impl&%1::update": 30,
-    "simple_example::tables::cell_map::impl&%1::take": 25,
-    "simple_example::tables::cell_map::impl&%1::untake": 25,
-    "simple_example::tables::cell_map::impl&%1::tracked_borrow": 9,
-    "simple_example::tables::cell_map::test": 32,
-    "simple_example::state::LinkSystem::impl&%16::empty": 17,
-    "simple_example::state::LinkSystem::impl&%16::clean_links": 11,
-    "simple_example::state::LinkSystem::impl&%19::clean_links_asserts": 5,
-    "simple_example::state::LinkSystem::impl&%16::token_invariant": 12,
-    "simple_example::state::LinkSystem::impl&%19::token_invariant_asserts": 6,
-    "simple_example::state::LinkSystem::impl&%16::contains_next": 11,
-    "simple_example::state::LinkSystem::impl&%19::contains_next_asserts": 8,
-    "simple_example::state::LinkSystem::impl&%16::contains_back": 11,
-    "simple_example::state::LinkSystem::impl&%19::contains_back_asserts": 8,
-    "simple_example::state::LinkSystem::impl&%16::contains_child": 11,
-    "simple_example::state::LinkSystem::impl&%19::contains_child_asserts": 8,
-    "simple_example::state::LinkSystem::impl&%16::weak_connections": 10,
-    "simple_example::state::LinkSystem::impl&%19::weak_connections_asserts": 7,
-    "simple_example::state::LinkSystem::impl&%16::depth_bound": 12,
-    "simple_example::state::LinkSystem::impl&%19::depth_bound_asserts": 6,
-    "simple_example::state::LinkSystem::impl&%16::borrow_token": 18,
-    "simple_example::state::LinkSystem::impl&%19::borrow_token_asserts": 11,
-    "simple_example::state::LinkSystem::impl&%16::insert_root": 14,
-    "simple_example::state::LinkSystem::impl&%16::insert_child": 28,
-    "simple_example::state::LinkSystem::impl&%16::insert_child_fix_next": 18,
-    "simple_example::state::LinkSystem::impl&%16::insert_child_finish_next": 21,
-    "simple_example::state::LinkSystem::impl&%16::finish_insert": 20,
-    "simple_example::state::LinkSystem::impl&%16::revoke_single": 17,
-    "simple_example::state::LinkSystem::impl&%16::revoke_take_back": 21,
-    "simple_example::state::LinkSystem::impl&%16::revoke_take_next": 21,
-    "simple_example::state::LinkSystem::impl&%16::revoke_put_back": 21,
-    "simple_example::state::LinkSystem::impl&%16::revoke_put_next": 21,
-    "simple_example::state::LinkSystem::impl&%16::finish_revoke_single": 15,
-    "simple_example::meta::impl&%0::is_init": 3,
-    "simple_example::meta::impl&%0::is_wf": 2,
-    "simple_example::meta::impl&%1::is_nonnull": 7,
-    "simple_example::meta::impl&%2::insert_root": 21,
-    "simple_example::tables::impl&%3::insert": 38,
-    "simple_example::meta::impl&%2::insert_child": 61,
-    "simple_example::tables::impl&%3::get": 16,
-    "simple_example::meta::impl&%2::borrow_node": 15,
-    "simple_example::meta::impl&%2::lemma_child_null_imp_none": 15,
-    "simple_example::meta::impl&%2::revoke_single": 51,
-    "simple_example::meta::impl&%2::lemma_back_null_imp_none": 15,
-    "simple_example::meta::impl&%2::lemma_next_null_imp_none": 15,
-    "simple_example::tables::impl&%3::remove": 32,
-    "simple_example::meta::impl&%2::revoke_children": 44,
-    "simple_example::meta::impl&%2::first_child": 37,
-    "simple_example::meta::impl&%2::cap_in": 11,
-    "simple_example::tables::impl&%3::get_act_table": 24,
-    "simple_example::tables::impl&%1::get_element": 10,
-    "simple_example::meta::impl&%2::revoke_all": 16
-}
+"Fun\nsimple_example::state::LinkSystem::show::insert_root": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::show::insert_child": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::show::insert_child_fix_next": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::show::insert_child_finish_next": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::show::finish_insert": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::show::revoke_single": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::show::revoke_take_back": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::show::revoke_take_next": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::show::revoke_put_back": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::show::revoke_put_next": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::show::finish_revoke_single": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::show::empty": 4 [None, None, None, None]
+"Fun\nsimple_example::specs::link_map::MonotonicFunction::apply": 1 [None]
+"Fun\nsimple_example::specs::link_map::MonotonicFunction::condition": 1 [None]
+"Fun\nsimple_example::state::LinkSystem::impl&%5::instance_id": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%5::value": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%5::agree": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%5::arbitrary": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%6::unique": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%8::instance_id": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%8::value": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%8::agree": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%8::arbitrary": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%9::unique": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%11::instance_id": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%11::value": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%11::agree": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%11::arbitrary": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%12::unique": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%14::instance_id": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%14::value": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%14::agree": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%14::arbitrary": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%15::unique": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::id": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::lemma_msg_state_tokens_disjoint": 3 [None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::lemma_msg_token_invariant": 3 [None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::lemma_msg_map_tokens": 3 [None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::lemma_msg_link_conditions": 3 [None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::lemma_msg_token_value": 3 [None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::lemma_msg_pos_depth": 3 [None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::lemma_msg_depth_bound": 3 [None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::lemma_msg_state_inv": 3 [None, None, None]
+"Fun\nsimple_example::meta::VERUS_layout_of_Node": 3 [None, None, None]
+"Fun\nsimple_example::state::Token::ptr": 1 [None]
+"Fun\nsimple_example::state::Token::is_nonnull": 4 [None, None, None, None]
+"Fun\nsimple_example::state::Token::cond": 1 [None]
+"Fun\nsimple_example::tables::MetaCapTable::insert": 9 [None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::MetaCapTable::remove": 9 [None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::MetaCapTable::get": 14 [None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::MetaCapTable::wf": 2 [None, None]
+"Fun\nsimple_example::tables::MetaCapTable::get_act_table": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::ith_predecessor": 4 [None, None, None, None]
+"Fun\nsimple_example::lemmas::common::predecessor": 2 [None, None]
+"Fun\nsimple_example::lemmas::insert_view::impl&%0::insert_node": 3 [None, None, None]
+"Fun\nsimple_example::lemmas::insert_view::impl&%0::insert_view_node": 2 [None, None]
+"Fun\nsimple_example::lemmas::insert_view::impl&%0::child_update": 3 [None, None, None]
+"Fun\nsimple_example::lemmas::insert_view::impl&%0::next_update": 5 [None, None, None, None, None]
+"Fun\nsimple_example::lemmas::insert_view::impl&%0::update": 4 [None, None, None, None]
+"Fun\nsimple_example::lemmas::insert_view::impl&%0::parent_update": 3 [None, None, None]
+"Fun\nsimple_example::lemmas::insert_view::impl&%0::invariants": 5 [None, None, None, None, None]
+"Fun\nsimple_example::lemmas::revoke_view::close_to": 2 [None, None]
+"Fun\nsimple_example::lemmas::revoke_view::revoke_back_update": 3 [None, None, None]
+"Fun\nsimple_example::lemmas::revoke_view::revoke_next_update": 3 [None, None, None]
+"Fun\nsimple_example::specs::cap_map::get_parent": 2 [None, None]
+"Fun\nsimple_example::specs::cap_map::edge": 4 [None, None, None, None]
+"Fun\nsimple_example::specs::cap_map::sibling_of": 2 [None, None]
+"Fun\nsimple_example::specs::cap_map::depth_fn": 4 [None, None, None, None]
+"Fun\nsimple_example::specs::cap_map::depth": 2 [None, None]
+"Fun\nsimple_example::specs::cap_map::acyclic": 2 [None, None]
+"Fun\nsimple_example::specs::cap_map::tree_ish": 5 [None, None, None, None, None]
+"Fun\nsimple_example::specs::cap_map::parents": 3 [None, None, None]
+"Fun\nsimple_example::specs::cap_map::transitive_child_of": 8 [None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::specs::cap_map::transitive_children": 4 [None, None, None, None]
+"Fun\nsimple_example::specs::cap_map::insert_child": 5 [None, None, None, None, None]
+"Fun\nsimple_example::specs::cap_map::revoke_single_parent_update": 5 [None, None, None, None, None]
+"Fun\nsimple_example::specs::link_map::view": 3 [None, None, None]
+"Fun\nsimple_example::specs::link_map::impl&%0::to_spec": 2 [None, None]
+"Fun\nsimple_example::specs::link_map::impl&%1::apply": 3 [None, None, None]
+"Fun\nsimple_example::specs::link_map::impl&%1::condition": 3 [None, None, None]
+"Fun\nsimple_example::specs::link_map::impl&%2::apply": 3 [None, None, None]
+"Fun\nsimple_example::specs::link_map::impl&%2::condition": 3 [None, None, None]
+"Fun\nsimple_example::specs::link_map::decreasing_condition": 6 [None, None, None, None, None, None]
+"Fun\nsimple_example::specs::link_map::siblings": 13 [None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::specs::link_map::next_index": 4 [None, None, None, None]
+"Fun\nsimple_example::specs::link_map::decreasing": 4 [None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%0::view": 8 [None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%1::wf": 6 [None, None, None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%1::vacated": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%1::addrs_match": 6 [None, None, None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%1::init_besides": 8 [None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%1::uninit_vacated": 8 [None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%1::credit_addrs": 6 [None, None, None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%1::map_addrs": 8 [None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%1::index_opt": 9 [None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_3": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_insert_root_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_insert_root_1": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_insert_child_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_insert_child_1": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_insert_child_2": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_insert_child_fix_next_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_insert_child_fix_next_1": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_insert_child_finish_next_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_insert_child_finish_next_1": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_insert_child_finish_next_2": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_insert_child_finish_next_3": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_finish_insert_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_finish_insert_1": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_finish_insert_2": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_revoke_single_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_revoke_put_back_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_revoke_put_next_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_finish_revoke_single_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%0::arrow_dummy_to_use_type_params_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::is_insert_root": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::get_insert_root_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::get_insert_root_1": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::is_insert_child": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::get_insert_child_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::get_insert_child_1": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::get_insert_child_2": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::is_insert_child_fix_next": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::get_insert_child_fix_next_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::get_insert_child_fix_next_1": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::is_insert_child_finish_next": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::get_insert_child_finish_next_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::get_insert_child_finish_next_1": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::get_insert_child_finish_next_2": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::get_insert_child_finish_next_3": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::is_finish_insert": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::get_finish_insert_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::get_finish_insert_1": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::get_finish_insert_2": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::is_revoke_single": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::get_revoke_single_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::is_revoke_take_back": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::is_revoke_take_next": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::is_revoke_put_back": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::get_revoke_put_back_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::is_revoke_put_next": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::get_revoke_put_next_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::is_finish_revoke_single": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::get_finish_revoke_single_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::is_dummy_to_use_type_params": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%1::get_dummy_to_use_type_params_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%2::arrow_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%2::arrow_dummy_to_use_type_params_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%3::is_empty": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%3::is_dummy_to_use_type_params": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%3::get_dummy_to_use_type_params_0": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::empty": 3 [None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::empty_enabled": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_root": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_root_strong": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_root_enabled": 5 [None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_child": 17 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_child_strong": 17 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_child_enabled": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_child_fix_next": 8 [None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_child_fix_next_strong": 8 [None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_child_fix_next_enabled": 3 [None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_child_finish_next": 13 [None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_child_finish_next_strong": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_child_finish_next_enabled": 6 [None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::finish_insert": 10 [None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::finish_insert_strong": 10 [None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::finish_insert_enabled": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_single": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_single_strong": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_single_enabled": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_take_back": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_take_back_strong": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_take_back_enabled": 3 [None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_take_next": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_take_next_strong": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_take_next_enabled": 3 [None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_put_back": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_put_back_strong": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_put_back_enabled": 8 [None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_put_next": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_put_next_strong": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_put_next_enabled": 8 [None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::finish_revoke_single": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::finish_revoke_single_strong": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::finish_revoke_single_enabled": 3 [None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::next_by": 13 [None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::next": 3 [None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::next_strong_by": 13 [None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::next_strong": 3 [None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::init_by": 3 [None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::init": 3 [None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::invariant": 10 [None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::state_tokens_disjoint": 5 [None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::token_invariant": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::map_tokens": 5 [None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::link_conditions": 3 [None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::token_value": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::pos_depth": 2 [None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::depth_bound": 4 [None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::state_inv": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::meta::impl&%0::wf": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::meta::impl&%0::back": 2 [None, None]
+"Fun\nsimple_example::meta::impl&%0::next": 2 [None, None]
+"Fun\nsimple_example::meta::impl&%0::child": 2 [None, None]
+"Fun\nsimple_example::meta::impl&%0::first_child": 2 [None, None]
+"Fun\nsimple_example::meta::impl&%1::ptr": 4 [None, None, None, None]
+"Fun\nsimple_example::meta::impl&%1::cond": 8 [None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::meta::impl&%2::ties": 18 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::meta::impl&%2::wf": 19 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::meta::impl&%2::view": 3 [None, None, None]
+"Fun\nsimple_example::meta::impl&%2::contains": 4 [None, None, None, None]
+"Fun\nsimple_example::meta::impl&%2::get": 6 [None, None, None, None, None, None]
+"Fun\nsimple_example::meta::impl&%2::dom": 3 [None, None, None]
+"Fun\nsimple_example::meta::impl&%2::spec": 4 [None, None, None, None]
+"Fun\nsimple_example::state::impl&%0::arrow_Unchanged_0": 1 [None]
+"Fun\nsimple_example::state::impl&%0::arrow_Taken_0": 1 [None]
+"Fun\nsimple_example::state::impl&%0::arrow_Fixed_0": 1 [None]
+"Fun\nsimple_example::state::impl&%1::dom": 3 [None, None, None]
+"Fun\nsimple_example::state::impl&%1::fixed": 1 [None]
+"Fun\nsimple_example::state::impl&%1::key": 1 [None]
+"Fun\nsimple_example::state::impl&%2::arrow_parent": 1 [None]
+"Fun\nsimple_example::state::impl&%2::arrow_back": 1 [None]
+"Fun\nsimple_example::state::impl&%2::arrow_inserted": 1 [None]
+"Fun\nsimple_example::state::impl&%2::arrow_key": 1 [None]
+"Fun\nsimple_example::state::impl&%2::arrow_first_child": 1 [None]
+"Fun\nsimple_example::state::impl&%2::arrow_InsertChild_inserted": 1 [None]
+"Fun\nsimple_example::state::impl&%2::arrow_InsertChild_parent": 1 [None]
+"Fun\nsimple_example::state::impl&%2::arrow_InsertChild_next": 1 [None]
+"Fun\nsimple_example::state::impl&%2::arrow_RevokeSingle_key": 1 [None]
+"Fun\nsimple_example::state::impl&%2::arrow_RevokeSingle_back": 1 [None]
+"Fun\nsimple_example::state::impl&%2::arrow_RevokeSingle_next": 1 [None]
+"Fun\nsimple_example::state::impl&%2::arrow_RevokeSingle_first_child": 1 [None]
+"Fun\nsimple_example::state::impl&%3::dom": 5 [None, None, None, None, None]
+"Fun\nsimple_example::state::impl&%3::allow_broken_back_link": 1 [None]
+"Fun\nsimple_example::state::impl&%3::allow_broken_next_link": 2 [None, None]
+"Fun\nsimple_example::state::impl&%3::allow_broken_child_link": 2 [None, None]
+"Fun\nsimple_example::state::back_link_condition": 6 [None, None, None, None, None, None]
+"Fun\nsimple_example::state::next_link_condition": 6 [None, None, None, None, None, None]
+"Fun\nsimple_example::state::child_link_condition": 6 [None, None, None, None, None, None]
+"Fun\nsimple_example::state::token_invariant": 8 [None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::revoke_back_fixed": 3 [None, None, None]
+"Fun\nsimple_example::state::revoke_next_fixed": 3 [None, None, None]
+"Fun\nsimple_example::state::link_condition": 6 [None, None, None, None, None, None]
+"Fun\nsimple_example::state::clean_links": 2 [None, None]
+"Fun\nsimple_example::tables::impl&%0::view": 8 [None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::impl&%2::view": 20 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::impl&%3::wf": 18 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::take_step::empty": 6 [None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::empty_inductive": 15 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::take_step::insert_root": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_root_inductive": 15 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_root_asserts": 9 [None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::take_step::insert_child": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_child_inductive": 16 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_child_asserts": 21 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::take_step::insert_child_fix_next": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_child_fix_next_inductive": 15 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_child_fix_next_asserts": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::take_step::insert_child_finish_next": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_child_finish_next_inductive": 15 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::insert_child_finish_next_asserts": 14 [None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::take_step::finish_insert": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::finish_insert_inductive": 15 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::finish_insert_asserts": 13 [None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::take_step::revoke_single": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_single_inductive": 17 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_single_asserts": 10 [None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::take_step::revoke_take_back": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_take_back_inductive": 15 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_take_back_asserts": 14 [None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::take_step::revoke_take_next": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_take_next_inductive": 15 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_take_next_asserts": 14 [None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::take_step::revoke_put_back": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_put_back_inductive": 15 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_put_back_asserts": 14 [None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::take_step::revoke_put_next": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_put_next_inductive": 15 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::revoke_put_next_asserts": 14 [None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::take_step::finish_revoke_single": 6 [None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::finish_revoke_single_inductive": 15 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_siblings_contained": 13 [None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_siblings_unfold": 9 [None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_siblings_none_empty": 3 [None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_siblings_take_n": 16 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_siblings_unchanged": 13 [None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_siblings_unchanged_after": 18 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_siblings_decreasing": 12 [None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_siblings_no_loop": 8 [None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_ith_predecessor_univalent": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_no_predecessor": 12 [None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_predecessor_transitive": 12 [None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_child_of_first_child": 15 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_siblings_depth": 12 [None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_seq_remove_value_contains_a": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_seq_remove_value_contains_b": 8 [None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_child_of_depth": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_child_of_univalent": 14 [None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_view_tree_ish": 16 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_parent_child": 9 [None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_sibling_of_next": 18 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_siblings_unchanged_local": 16 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_sib_back_some": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_view_acyclic": 14 [None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_is_parent_of": 12 [None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_depth_increase": 6 [None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_transitive_children_empty": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_transitive_child_parent": 9 [None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::common::lemma_transitive_child_extend": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::insert_view::lemma_insert_siblings_unchanged": 17 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::insert_view::impl&%0::lemma_view_child_update": 21 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::insert_view::impl&%0::lemma_view_next_update": 14 [None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::insert_view::impl&%0::lemma_view_update": 21 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::revoke_view::lemma_siblings_jump": 32 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::revoke_view::lemma_revoke_spec": 40 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::revoke_view::lemma_view_acyclic_post": 17 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::revoke_view::lemma_transitive_changes_forward": 19 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::revoke_view::lemma_transitive_changes_backward": 18 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::revoke_view::lemma_revoke_transitive_changes": 14 [None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::revoke_view::lemma_revoke_transitive_non_changes": 17 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::lemmas::revoke_view::lemma_still_transitive_child": 14 [None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::specs::cap_map::transitive_child_of_decreases": 6 [None, None, None, None, None, None]
+"Fun\nsimple_example::specs::link_map::siblings_decreases": 3 [None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%1::lemma_is_init": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%1::new": 17 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%1::contains_key": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%1::lemma_dom_credits_eq_dom_m": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%1::insert": 28 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%1::borrow_perm": 18 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%1::get": 15 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%1::update": 30 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%1::take": 25 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%1::untake": 25 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::impl&%1::tracked_borrow": 9 [None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::cell_map::test": 32 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::empty": 17 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::clean_links": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::clean_links_asserts": 5 [None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::token_invariant": 12 [None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::token_invariant_asserts": 6 [None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::contains_next": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::contains_next_asserts": 8 [None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::contains_back": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::contains_back_asserts": 8 [None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::contains_child": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::contains_child_asserts": 8 [None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::weak_connections": 10 [None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::weak_connections_asserts": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::depth_bound": 12 [None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::depth_bound_asserts": 6 [None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::borrow_token": 18 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%19::borrow_token_asserts": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::insert_root": 14 [None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::insert_child": 28 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::insert_child_fix_next": 18 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::insert_child_finish_next": 21 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::finish_insert": 20 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::revoke_single": 17 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::revoke_take_back": 21 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::revoke_take_next": 21 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::revoke_put_back": 21 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::revoke_put_next": 21 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::state::LinkSystem::impl&%16::finish_revoke_single": 15 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::meta::impl&%0::is_init": 3 [None, None, None]
+"Fun\nsimple_example::meta::impl&%0::is_wf": 2 [None, None]
+"Fun\nsimple_example::meta::impl&%1::is_nonnull": 7 [None, None, None, None, None, None, None]
+"Fun\nsimple_example::meta::impl&%2::insert_root": 21 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::impl&%3::insert": 38 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::meta::impl&%2::insert_child": 61 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::impl&%3::get": 16 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::meta::impl&%2::borrow_node": 15 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::meta::impl&%2::lemma_child_null_imp_none": 15 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::meta::impl&%2::revoke_single": 51 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::meta::impl&%2::lemma_back_null_imp_none": 15 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::meta::impl&%2::lemma_next_null_imp_none": 15 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::impl&%3::remove": 32 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::meta::impl&%2::revoke_children": 44 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::meta::impl&%2::first_child": 37 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::meta::impl&%2::cap_in": 11 [None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::impl&%3::get_act_table": 24 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::tables::impl&%1::get_element": 10 [None, None, None, None, None, None, None, None, None, None]
+"Fun\nsimple_example::meta::impl&%2::revoke_all": 16 [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+{"simple_example::state::LinkSystem::show::insert_root": 4, "simple_example::state::LinkSystem::show::insert_child": 4, "simple_example::state::LinkSystem::show::insert_child_fix_next": 4, "simple_example::state::LinkSystem::show::insert_child_finish_next": 4, "simple_example::state::LinkSystem::show::finish_insert": 4, "simple_example::state::LinkSystem::show::revoke_single": 4, "simple_example::state::LinkSystem::show::revoke_take_back": 4, "simple_example::state::LinkSystem::show::revoke_take_next": 4, "simple_example::state::LinkSystem::show::revoke_put_back": 4, "simple_example::state::LinkSystem::show::revoke_put_next": 4, "simple_example::state::LinkSystem::show::finish_revoke_single": 4, "simple_example::state::LinkSystem::show::empty": 4, "simple_example::specs::link_map::MonotonicFunction::apply": 1, "simple_example::specs::link_map::MonotonicFunction::condition": 1, "simple_example::state::LinkSystem::impl&%5::instance_id": 4, "simple_example::state::LinkSystem::impl&%5::value": 4, "simple_example::state::LinkSystem::impl&%5::agree": 4, "simple_example::state::LinkSystem::impl&%5::arbitrary": 4, "simple_example::state::LinkSystem::impl&%6::unique": 4, "simple_example::state::LinkSystem::impl&%8::instance_id": 4, "simple_example::state::LinkSystem::impl&%8::value": 4, "simple_example::state::LinkSystem::impl&%8::agree": 4, "simple_example::state::LinkSystem::impl&%8::arbitrary": 4, "simple_example::state::LinkSystem::impl&%9::unique": 4, "simple_example::state::LinkSystem::impl&%11::instance_id": 4, "simple_example::state::LinkSystem::impl&%11::value": 4, "simple_example::state::LinkSystem::impl&%11::agree": 4, "simple_example::state::LinkSystem::impl&%11::arbitrary": 4, "simple_example::state::LinkSystem::impl&%12::unique": 4, "simple_example::state::LinkSystem::impl&%14::instance_id": 4, "simple_example::state::LinkSystem::impl&%14::value": 4, "simple_example::state::LinkSystem::impl&%14::agree": 4, "simple_example::state::LinkSystem::impl&%14::arbitrary": 4, "simple_example::state::LinkSystem::impl&%15::unique": 4, "simple_example::state::LinkSystem::impl&%16::id": 2, "simple_example::state::LinkSystem::impl&%19::lemma_msg_state_tokens_disjoint": 3, "simple_example::state::LinkSystem::impl&%19::lemma_msg_token_invariant": 3, "simple_example::state::LinkSystem::impl&%19::lemma_msg_map_tokens": 3, "simple_example::state::LinkSystem::impl&%19::lemma_msg_link_conditions": 3, "simple_example::state::LinkSystem::impl&%19::lemma_msg_token_value": 3, "simple_example::state::LinkSystem::impl&%19::lemma_msg_pos_depth": 3, "simple_example::state::LinkSystem::impl&%19::lemma_msg_depth_bound": 3, "simple_example::state::LinkSystem::impl&%19::lemma_msg_state_inv": 3, "simple_example::meta::VERUS_layout_of_Node": 3, "simple_example::state::Token::ptr": 1, "simple_example::state::Token::is_nonnull": 4, "simple_example::state::Token::cond": 1, "simple_example::tables::MetaCapTable::insert": 9, "simple_example::tables::MetaCapTable::remove": 9, "simple_example::tables::MetaCapTable::get": 14, "simple_example::tables::MetaCapTable::wf": 2, "simple_example::tables::MetaCapTable::get_act_table": 7, "simple_example::lemmas::common::ith_predecessor": 4, "simple_example::lemmas::common::predecessor": 2, "simple_example::lemmas::insert_view::impl&%0::insert_node": 3, "simple_example::lemmas::insert_view::impl&%0::insert_view_node": 2, "simple_example::lemmas::insert_view::impl&%0::child_update": 3, "simple_example::lemmas::insert_view::impl&%0::next_update": 5, "simple_example::lemmas::insert_view::impl&%0::update": 4, "simple_example::lemmas::insert_view::impl&%0::parent_update": 3, "simple_example::lemmas::insert_view::impl&%0::invariants": 5, "simple_example::lemmas::revoke_view::close_to": 2, "simple_example::lemmas::revoke_view::revoke_back_update": 3, "simple_example::lemmas::revoke_view::revoke_next_update": 3, "simple_example::specs::cap_map::get_parent": 2, "simple_example::specs::cap_map::edge": 4, "simple_example::specs::cap_map::sibling_of": 2, "simple_example::specs::cap_map::depth_fn": 4, "simple_example::specs::cap_map::depth": 2, "simple_example::specs::cap_map::acyclic": 2, "simple_example::specs::cap_map::tree_ish": 5, "simple_example::specs::cap_map::parents": 3, "simple_example::specs::cap_map::transitive_child_of": 8, "simple_example::specs::cap_map::transitive_children": 4, "simple_example::specs::cap_map::insert_child": 5, "simple_example::specs::cap_map::revoke_single_parent_update": 5, "simple_example::specs::link_map::view": 3, "simple_example::specs::link_map::impl&%0::to_spec": 2, "simple_example::specs::link_map::impl&%1::apply": 3, "simple_example::specs::link_map::impl&%1::condition": 3, "simple_example::specs::link_map::impl&%2::apply": 3, "simple_example::specs::link_map::impl&%2::condition": 3, "simple_example::specs::link_map::decreasing_condition": 6, "simple_example::specs::link_map::siblings": 13, "simple_example::specs::link_map::next_index": 4, "simple_example::specs::link_map::decreasing": 4, "simple_example::tables::cell_map::impl&%0::view": 8, "simple_example::tables::cell_map::impl&%1::wf": 6, "simple_example::tables::cell_map::impl&%1::vacated": 7, "simple_example::tables::cell_map::impl&%1::addrs_match": 6, "simple_example::tables::cell_map::impl&%1::init_besides": 8, "simple_example::tables::cell_map::impl&%1::uninit_vacated": 8, "simple_example::tables::cell_map::impl&%1::credit_addrs": 6, "simple_example::tables::cell_map::impl&%1::map_addrs": 8, "simple_example::tables::cell_map::impl&%1::index_opt": 9, "simple_example::state::LinkSystem::impl&%0::arrow_0": 2, "simple_example::state::LinkSystem::impl&%0::arrow_3": 2, "simple_example::state::LinkSystem::impl&%0::arrow_insert_root_0": 2, "simple_example::state::LinkSystem::impl&%0::arrow_insert_root_1": 2, "simple_example::state::LinkSystem::impl&%0::arrow_insert_child_0": 2, "simple_example::state::LinkSystem::impl&%0::arrow_insert_child_1": 2, "simple_example::state::LinkSystem::impl&%0::arrow_insert_child_2": 2, "simple_example::state::LinkSystem::impl&%0::arrow_insert_child_fix_next_0": 2, "simple_example::state::LinkSystem::impl&%0::arrow_insert_child_fix_next_1": 2, "simple_example::state::LinkSystem::impl&%0::arrow_insert_child_finish_next_0": 2, "simple_example::state::LinkSystem::impl&%0::arrow_insert_child_finish_next_1": 2, "simple_example::state::LinkSystem::impl&%0::arrow_insert_child_finish_next_2": 2, "simple_example::state::LinkSystem::impl&%0::arrow_insert_child_finish_next_3": 2, "simple_example::state::LinkSystem::impl&%0::arrow_finish_insert_0": 2, "simple_example::state::LinkSystem::impl&%0::arrow_finish_insert_1": 2, "simple_example::state::LinkSystem::impl&%0::arrow_finish_insert_2": 2, "simple_example::state::LinkSystem::impl&%0::arrow_revoke_single_0": 2, "simple_example::state::LinkSystem::impl&%0::arrow_revoke_put_back_0": 2, "simple_example::state::LinkSystem::impl&%0::arrow_revoke_put_next_0": 2, "simple_example::state::LinkSystem::impl&%0::arrow_finish_revoke_single_0": 2, "simple_example::state::LinkSystem::impl&%0::arrow_dummy_to_use_type_params_0": 2, "simple_example::state::LinkSystem::impl&%1::is_insert_root": 2, "simple_example::state::LinkSystem::impl&%1::get_insert_root_0": 2, "simple_example::state::LinkSystem::impl&%1::get_insert_root_1": 2, "simple_example::state::LinkSystem::impl&%1::is_insert_child": 2, "simple_example::state::LinkSystem::impl&%1::get_insert_child_0": 2, "simple_example::state::LinkSystem::impl&%1::get_insert_child_1": 2, "simple_example::state::LinkSystem::impl&%1::get_insert_child_2": 2, "simple_example::state::LinkSystem::impl&%1::is_insert_child_fix_next": 2, "simple_example::state::LinkSystem::impl&%1::get_insert_child_fix_next_0": 2, "simple_example::state::LinkSystem::impl&%1::get_insert_child_fix_next_1": 2, "simple_example::state::LinkSystem::impl&%1::is_insert_child_finish_next": 2, "simple_example::state::LinkSystem::impl&%1::get_insert_child_finish_next_0": 2, "simple_example::state::LinkSystem::impl&%1::get_insert_child_finish_next_1": 2, "simple_example::state::LinkSystem::impl&%1::get_insert_child_finish_next_2": 2, "simple_example::state::LinkSystem::impl&%1::get_insert_child_finish_next_3": 2, "simple_example::state::LinkSystem::impl&%1::is_finish_insert": 2, "simple_example::state::LinkSystem::impl&%1::get_finish_insert_0": 2, "simple_example::state::LinkSystem::impl&%1::get_finish_insert_1": 2, "simple_example::state::LinkSystem::impl&%1::get_finish_insert_2": 2, "simple_example::state::LinkSystem::impl&%1::is_revoke_single": 2, "simple_example::state::LinkSystem::impl&%1::get_revoke_single_0": 2, "simple_example::state::LinkSystem::impl&%1::is_revoke_take_back": 2, "simple_example::state::LinkSystem::impl&%1::is_revoke_take_next": 2, "simple_example::state::LinkSystem::impl&%1::is_revoke_put_back": 2, "simple_example::state::LinkSystem::impl&%1::get_revoke_put_back_0": 2, "simple_example::state::LinkSystem::impl&%1::is_revoke_put_next": 2, "simple_example::state::LinkSystem::impl&%1::get_revoke_put_next_0": 2, "simple_example::state::LinkSystem::impl&%1::is_finish_revoke_single": 2, "simple_example::state::LinkSystem::impl&%1::get_finish_revoke_single_0": 2, "simple_example::state::LinkSystem::impl&%1::is_dummy_to_use_type_params": 2, "simple_example::state::LinkSystem::impl&%1::get_dummy_to_use_type_params_0": 2, "simple_example::state::LinkSystem::impl&%2::arrow_0": 2, "simple_example::state::LinkSystem::impl&%2::arrow_dummy_to_use_type_params_0": 2, "simple_example::state::LinkSystem::impl&%3::is_empty": 2, "simple_example::state::LinkSystem::impl&%3::is_dummy_to_use_type_params": 2, "simple_example::state::LinkSystem::impl&%3::get_dummy_to_use_type_params_0": 2, "simple_example::state::LinkSystem::impl&%19::empty": 3, "simple_example::state::LinkSystem::impl&%19::empty_enabled": 2, "simple_example::state::LinkSystem::impl&%19::insert_root": 7, "simple_example::state::LinkSystem::impl&%19::insert_root_strong": 7, "simple_example::state::LinkSystem::impl&%19::insert_root_enabled": 5, "simple_example::state::LinkSystem::impl&%19::insert_child": 17, "simple_example::state::LinkSystem::impl&%19::insert_child_strong": 17, "simple_example::state::LinkSystem::impl&%19::insert_child_enabled": 7, "simple_example::state::LinkSystem::impl&%19::insert_child_fix_next": 8, "simple_example::state::LinkSystem::impl&%19::insert_child_fix_next_strong": 8, "simple_example::state::LinkSystem::impl&%19::insert_child_fix_next_enabled": 3, "simple_example::state::LinkSystem::impl&%19::insert_child_finish_next": 13, "simple_example::state::LinkSystem::impl&%19::insert_child_finish_next_strong": 11, "simple_example::state::LinkSystem::impl&%19::insert_child_finish_next_enabled": 6, "simple_example::state::LinkSystem::impl&%19::finish_insert": 10, "simple_example::state::LinkSystem::impl&%19::finish_insert_strong": 10, "simple_example::state::LinkSystem::impl&%19::finish_insert_enabled": 7, "simple_example::state::LinkSystem::impl&%19::revoke_single": 7, "simple_example::state::LinkSystem::impl&%19::revoke_single_strong": 7, "simple_example::state::LinkSystem::impl&%19::revoke_single_enabled": 4, "simple_example::state::LinkSystem::impl&%19::revoke_take_back": 11, "simple_example::state::LinkSystem::impl&%19::revoke_take_back_strong": 11, "simple_example::state::LinkSystem::impl&%19::revoke_take_back_enabled": 3, "simple_example::state::LinkSystem::impl&%19::revoke_take_next": 11, "simple_example::state::LinkSystem::impl&%19::revoke_take_next_strong": 11, "simple_example::state::LinkSystem::impl&%19::revoke_take_next_enabled": 3, "simple_example::state::LinkSystem::impl&%19::revoke_put_back": 11, "simple_example::state::LinkSystem::impl&%19::revoke_put_back_strong": 11, "simple_example::state::LinkSystem::impl&%19::revoke_put_back_enabled": 8, "simple_example::state::LinkSystem::impl&%19::revoke_put_next": 11, "simple_example::state::LinkSystem::impl&%19::revoke_put_next_strong": 11, "simple_example::state::LinkSystem::impl&%19::revoke_put_next_enabled": 8, "simple_example::state::LinkSystem::impl&%19::finish_revoke_single": 4, "simple_example::state::LinkSystem::impl&%19::finish_revoke_single_strong": 4, "simple_example::state::LinkSystem::impl&%19::finish_revoke_single_enabled": 3, "simple_example::state::LinkSystem::impl&%19::next_by": 13, "simple_example::state::LinkSystem::impl&%19::next": 3, "simple_example::state::LinkSystem::impl&%19::next_strong_by": 13, "simple_example::state::LinkSystem::impl&%19::next_strong": 3, "simple_example::state::LinkSystem::impl&%19::init_by": 3, "simple_example::state::LinkSystem::impl&%19::init": 3, "simple_example::state::LinkSystem::impl&%19::invariant": 10, "simple_example::state::LinkSystem::impl&%19::state_tokens_disjoint": 5, "simple_example::state::LinkSystem::impl&%19::token_invariant": 4, "simple_example::state::LinkSystem::impl&%19::map_tokens": 5, "simple_example::state::LinkSystem::impl&%19::link_conditions": 3, "simple_example::state::LinkSystem::impl&%19::token_value": 4, "simple_example::state::LinkSystem::impl&%19::pos_depth": 2, "simple_example::state::LinkSystem::impl&%19::depth_bound": 4, "simple_example::state::LinkSystem::impl&%19::state_inv": 11, "simple_example::meta::impl&%0::wf": 11, "simple_example::meta::impl&%0::back": 2, "simple_example::meta::impl&%0::next": 2, "simple_example::meta::impl&%0::child": 2, "simple_example::meta::impl&%0::first_child": 2, "simple_example::meta::impl&%1::ptr": 4, "simple_example::meta::impl&%1::cond": 8, "simple_example::meta::impl&%2::ties": 18, "simple_example::meta::impl&%2::wf": 19, "simple_example::meta::impl&%2::view": 3, "simple_example::meta::impl&%2::contains": 4, "simple_example::meta::impl&%2::get": 6, "simple_example::meta::impl&%2::dom": 3, "simple_example::meta::impl&%2::spec": 4, "simple_example::state::impl&%0::arrow_Unchanged_0": 1, "simple_example::state::impl&%0::arrow_Taken_0": 1, "simple_example::state::impl&%0::arrow_Fixed_0": 1, "simple_example::state::impl&%1::dom": 3, "simple_example::state::impl&%1::fixed": 1, "simple_example::state::impl&%1::key": 1, "simple_example::state::impl&%2::arrow_parent": 1, "simple_example::state::impl&%2::arrow_back": 1, "simple_example::state::impl&%2::arrow_inserted": 1, "simple_example::state::impl&%2::arrow_key": 1, "simple_example::state::impl&%2::arrow_first_child": 1, "simple_example::state::impl&%2::arrow_InsertChild_inserted": 1, "simple_example::state::impl&%2::arrow_InsertChild_parent": 1, "simple_example::state::impl&%2::arrow_InsertChild_next": 1, "simple_example::state::impl&%2::arrow_RevokeSingle_key": 1, "simple_example::state::impl&%2::arrow_RevokeSingle_back": 1, "simple_example::state::impl&%2::arrow_RevokeSingle_next": 1, "simple_example::state::impl&%2::arrow_RevokeSingle_first_child": 1, "simple_example::state::impl&%3::dom": 5, "simple_example::state::impl&%3::allow_broken_back_link": 1, "simple_example::state::impl&%3::allow_broken_next_link": 2, "simple_example::state::impl&%3::allow_broken_child_link": 2, "simple_example::state::back_link_condition": 6, "simple_example::state::next_link_condition": 6, "simple_example::state::child_link_condition": 6, "simple_example::state::token_invariant": 8, "simple_example::state::revoke_back_fixed": 3, "simple_example::state::revoke_next_fixed": 3, "simple_example::state::link_condition": 6, "simple_example::state::clean_links": 2, "simple_example::tables::impl&%0::view": 8, "simple_example::tables::impl&%2::view": 20, "simple_example::tables::impl&%3::wf": 18, "simple_example::state::LinkSystem::take_step::empty": 6, "simple_example::state::LinkSystem::impl&%19::empty_inductive": 15, "simple_example::state::LinkSystem::take_step::insert_root": 7, "simple_example::state::LinkSystem::impl&%19::insert_root_inductive": 15, "simple_example::state::LinkSystem::impl&%19::insert_root_asserts": 9, "simple_example::state::LinkSystem::take_step::insert_child": 7, "simple_example::state::LinkSystem::impl&%19::insert_child_inductive": 16, "simple_example::state::LinkSystem::impl&%19::insert_child_asserts": 21, "simple_example::state::LinkSystem::take_step::insert_child_fix_next": 7, "simple_example::state::LinkSystem::impl&%19::insert_child_fix_next_inductive": 15, "simple_example::state::LinkSystem::impl&%19::insert_child_fix_next_asserts": 11, "simple_example::state::LinkSystem::take_step::insert_child_finish_next": 7, "simple_example::state::LinkSystem::impl&%19::insert_child_finish_next_inductive": 15, "simple_example::state::LinkSystem::impl&%19::insert_child_finish_next_asserts": 14, "simple_example::state::LinkSystem::take_step::finish_insert": 7, "simple_example::state::LinkSystem::impl&%19::finish_insert_inductive": 15, "simple_example::state::LinkSystem::impl&%19::finish_insert_asserts": 13, "simple_example::state::LinkSystem::take_step::revoke_single": 7, "simple_example::state::LinkSystem::impl&%19::revoke_single_inductive": 17, "simple_example::state::LinkSystem::impl&%19::revoke_single_asserts": 10, "simple_example::state::LinkSystem::take_step::revoke_take_back": 7, "simple_example::state::LinkSystem::impl&%19::revoke_take_back_inductive": 15, "simple_example::state::LinkSystem::impl&%19::revoke_take_back_asserts": 14, "simple_example::state::LinkSystem::take_step::revoke_take_next": 7, "simple_example::state::LinkSystem::impl&%19::revoke_take_next_inductive": 15, "simple_example::state::LinkSystem::impl&%19::revoke_take_next_asserts": 14, "simple_example::state::LinkSystem::take_step::revoke_put_back": 7, "simple_example::state::LinkSystem::impl&%19::revoke_put_back_inductive": 15, "simple_example::state::LinkSystem::impl&%19::revoke_put_back_asserts": 14, "simple_example::state::LinkSystem::take_step::revoke_put_next": 7, "simple_example::state::LinkSystem::impl&%19::revoke_put_next_inductive": 15, "simple_example::state::LinkSystem::impl&%19::revoke_put_next_asserts": 14, "simple_example::state::LinkSystem::take_step::finish_revoke_single": 6, "simple_example::state::LinkSystem::impl&%19::finish_revoke_single_inductive": 15, "simple_example::lemmas::common::lemma_siblings_contained": 13, "simple_example::lemmas::common::lemma_siblings_unfold": 9, "simple_example::lemmas::common::lemma_siblings_none_empty": 3, "simple_example::lemmas::common::lemma_siblings_take_n": 16, "simple_example::lemmas::common::lemma_siblings_unchanged": 13, "simple_example::lemmas::common::lemma_siblings_unchanged_after": 18, "simple_example::lemmas::common::lemma_siblings_decreasing": 12, "simple_example::lemmas::common::lemma_siblings_no_loop": 8, "simple_example::lemmas::common::lemma_ith_predecessor_univalent": 11, "simple_example::lemmas::common::lemma_no_predecessor": 12, "simple_example::lemmas::common::lemma_predecessor_transitive": 12, "simple_example::lemmas::common::lemma_child_of_first_child": 15, "simple_example::lemmas::common::lemma_siblings_depth": 12, "simple_example::lemmas::common::lemma_seq_remove_value_contains_a": 7, "simple_example::lemmas::common::lemma_seq_remove_value_contains_b": 8, "simple_example::lemmas::common::lemma_child_of_depth": 11, "simple_example::lemmas::common::lemma_child_of_univalent": 14, "simple_example::lemmas::common::lemma_view_tree_ish": 16, "simple_example::lemmas::common::lemma_parent_child": 9, "simple_example::lemmas::common::lemma_sibling_of_next": 18, "simple_example::lemmas::common::lemma_siblings_unchanged_local": 16, "simple_example::lemmas::common::lemma_sib_back_some": 11, "simple_example::lemmas::common::lemma_view_acyclic": 14, "simple_example::lemmas::common::lemma_is_parent_of": 12, "simple_example::lemmas::common::lemma_depth_increase": 6, "simple_example::lemmas::common::lemma_transitive_children_empty": 11, "simple_example::lemmas::common::lemma_transitive_child_parent": 9, "simple_example::lemmas::common::lemma_transitive_child_extend": 11, "simple_example::lemmas::insert_view::lemma_insert_siblings_unchanged": 17, "simple_example::lemmas::insert_view::impl&%0::lemma_view_child_update": 21, "simple_example::lemmas::insert_view::impl&%0::lemma_view_next_update": 14, "simple_example::lemmas::insert_view::impl&%0::lemma_view_update": 21, "simple_example::lemmas::revoke_view::lemma_siblings_jump": 32, "simple_example::lemmas::revoke_view::lemma_revoke_spec": 40, "simple_example::lemmas::revoke_view::lemma_view_acyclic_post": 17, "simple_example::lemmas::revoke_view::lemma_transitive_changes_forward": 19, "simple_example::lemmas::revoke_view::lemma_transitive_changes_backward": 18, "simple_example::lemmas::revoke_view::lemma_revoke_transitive_changes": 14, "simple_example::lemmas::revoke_view::lemma_revoke_transitive_non_changes": 17, "simple_example::lemmas::revoke_view::lemma_still_transitive_child": 14, "simple_example::specs::cap_map::transitive_child_of_decreases": 6, "simple_example::specs::link_map::siblings_decreases": 3, "simple_example::tables::cell_map::impl&%1::lemma_is_init": 11, "simple_example::tables::cell_map::impl&%1::new": 17, "simple_example::tables::cell_map::impl&%1::contains_key": 11, "simple_example::tables::cell_map::impl&%1::lemma_dom_credits_eq_dom_m": 11, "simple_example::tables::cell_map::impl&%1::insert": 28, "simple_example::tables::cell_map::impl&%1::borrow_perm": 18, "simple_example::tables::cell_map::impl&%1::get": 15, "simple_example::tables::cell_map::impl&%1::update": 30, "simple_example::tables::cell_map::impl&%1::take": 25, "simple_example::tables::cell_map::impl&%1::untake": 25, "simple_example::tables::cell_map::impl&%1::tracked_borrow": 9, "simple_example::tables::cell_map::test": 32, "simple_example::state::LinkSystem::impl&%16::empty": 17, "simple_example::state::LinkSystem::impl&%16::clean_links": 11, "simple_example::state::LinkSystem::impl&%19::clean_links_asserts": 5, "simple_example::state::LinkSystem::impl&%16::token_invariant": 12, "simple_example::state::LinkSystem::impl&%19::token_invariant_asserts": 6, "simple_example::state::LinkSystem::impl&%16::contains_next": 11, "simple_example::state::LinkSystem::impl&%19::contains_next_asserts": 8, "simple_example::state::LinkSystem::impl&%16::contains_back": 11, "simple_example::state::LinkSystem::impl&%19::contains_back_asserts": 8, "simple_example::state::LinkSystem::impl&%16::contains_child": 11, "simple_example::state::LinkSystem::impl&%19::contains_child_asserts": 8, "simple_example::state::LinkSystem::impl&%16::weak_connections": 10, "simple_example::state::LinkSystem::impl&%19::weak_connections_asserts": 7, "simple_example::state::LinkSystem::impl&%16::depth_bound": 12, "simple_example::state::LinkSystem::impl&%19::depth_bound_asserts": 6, "simple_example::state::LinkSystem::impl&%16::borrow_token": 18, "simple_example::state::LinkSystem::impl&%19::borrow_token_asserts": 11, "simple_example::state::LinkSystem::impl&%16::insert_root": 14, "simple_example::state::LinkSystem::impl&%16::insert_child": 28, "simple_example::state::LinkSystem::impl&%16::insert_child_fix_next": 18, "simple_example::state::LinkSystem::impl&%16::insert_child_finish_next": 21, "simple_example::state::LinkSystem::impl&%16::finish_insert": 20, "simple_example::state::LinkSystem::impl&%16::revoke_single": 17, "simple_example::state::LinkSystem::impl&%16::revoke_take_back": 21, "simple_example::state::LinkSystem::impl&%16::revoke_take_next": 21, "simple_example::state::LinkSystem::impl&%16::revoke_put_back": 21, "simple_example::state::LinkSystem::impl&%16::revoke_put_next": 21, "simple_example::state::LinkSystem::impl&%16::finish_revoke_single": 15, "simple_example::meta::impl&%0::is_init": 3, "simple_example::meta::impl&%0::is_wf": 2, "simple_example::meta::impl&%1::is_nonnull": 7, "simple_example::meta::impl&%2::insert_root": 21, "simple_example::tables::impl&%3::insert": 38, "simple_example::meta::impl&%2::insert_child": 61, "simple_example::tables::impl&%3::get": 16, "simple_example::meta::impl&%2::borrow_node": 15, "simple_example::meta::impl&%2::lemma_child_null_imp_none": 15, "simple_example::meta::impl&%2::revoke_single": 51, "simple_example::meta::impl&%2::lemma_back_null_imp_none": 15, "simple_example::meta::impl&%2::lemma_next_null_imp_none": 15, "simple_example::tables::impl&%3::remove": 32, "simple_example::meta::impl&%2::revoke_children": 44, "simple_example::meta::impl&%2::first_child": 37, "simple_example::meta::impl&%2::cap_in": 11, "simple_example::tables::impl&%3::get_act_table": 24, "simple_example::tables::impl&%1::get_element": 10, "simple_example::meta::impl&%2::revoke_all": 16}
