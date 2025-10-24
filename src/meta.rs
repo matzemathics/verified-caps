@@ -144,7 +144,7 @@ impl Token for NodePerm {
     }
 }
 
-struct Meta {
+pub struct Meta {
     table: HashMetaCapTable<*mut Node>,
     instance: Tracked<LinkSystem::Instance<NodePerm>>,
     spec: Tracked<LinkSystem::map<NodePerm>>,
@@ -154,6 +154,30 @@ struct Meta {
 }
 
 impl Meta {
+    pub fn new() -> (r: Self)
+    ensures
+        r.wf(),
+        r@.dom().is_empty()
+    {
+        let table = HashMetaCapTable::new();
+        let tracked (
+            Tracked(instance),
+            Tracked(map),
+            Tracked(tokens),
+            Tracked(state),
+            Tracked(generation)
+        ) = LinkSystem::Instance::<NodePerm>::empty(Map::tracked_empty());
+
+        Meta {
+            table,
+            instance: Tracked(instance),
+            spec: Tracked(map),
+            tokens: Tracked(tokens),
+            state: Tracked(state),
+            generation: Tracked(generation)
+        }
+    }
+
     spec fn ties(&self) -> bool {
         &&& self.spec@.instance_id() == self.instance@.id()
         &&& self.state@.instance_id() == self.instance@.id()
@@ -215,6 +239,7 @@ impl Meta {
         self.table.insert(key, ptr);
     }
 
+    #[inline(never)]
     pub fn insert_child(&mut self, parent: CapKey, child: CapKey)
         requires
             old(self)@.contains_key(parent),
@@ -233,12 +258,12 @@ impl Meta {
         };
 
         let parent_ptr = *self.table.get(parent).unwrap();
-        let next = self.borrow_node(parent).child;
+        let parent_node = self.borrow_node(parent, parent_ptr);
 
         let node = Node {
             activity: child.0,
             id: child.1,
-            next,
+            next: parent_node.child,
             child: null_mut(),
             back: parent_ptr,
             first_child: true
@@ -277,6 +302,7 @@ impl Meta {
         let tracked _ = parent_token.is_wf();
         let tracked NodePerm { pt: parent_pt, dealloc: parent_dealloc } = parent_token;
         let mut parent_node = ptr_mut_read(parent_ptr, Tracked(&mut parent_pt));
+        ptr_mut_write(parent_ptr, Tracked(&mut parent_pt), Node { child: ptr, ..parent_node });
 
         if parent_node.child as usize == 0 {
             proof!{
@@ -312,11 +338,9 @@ impl Meta {
             );
         }
 
-        parent_node.child = ptr;
-        ptr_mut_write(parent_ptr, Tracked(&mut parent_pt), parent_node);
-        let tracked parent_token = NodePerm { pt: parent_pt, dealloc: parent_dealloc };
-
         proof! {
+            let tracked parent_token = NodePerm { pt: parent_pt, dealloc: parent_dealloc };
+
             self.instance.borrow_mut().finish_insert(
                 parent_token, child, parent,
                 self.spec.borrow_mut(),
@@ -570,16 +594,17 @@ impl Meta {
         );
     }
 
-    fn borrow_node(&self, key: CapKey) -> (res: &Node)
+    #[inline]
+    fn borrow_node(&self, key: CapKey, ptr: *mut Node) -> (res: &Node)
         requires
             self.wf(),
             self@.contains_key(key),
+            self.table@[key] == ptr,
         ensures
             self.get(key) == res,
             self.contains(res),
             res.key() == key,
     {
-        let ptr = self.table.get(key).unwrap();
         let tracked borrow = self.instance.borrow().borrow_token(
             key,
             self.spec.borrow(),
@@ -589,7 +614,7 @@ impl Meta {
         assert(ptr == borrow.ptr());
         let tracked _ = borrow.is_init();
         assert(borrow.pt.value().key() == key);
-        ptr_ref(*ptr as *const _, Tracked(&borrow.pt))
+        ptr_ref(ptr as *const _, Tracked(&borrow.pt))
     }
 
     spec fn contains(&self, node: &Node) -> bool {
@@ -618,7 +643,8 @@ impl Meta {
             self.contains(res),
             transitive_child_of(view(self.spec()), res.key(), parent),
     {
-        let mut res = self.borrow_node(parent);
+        let parent_ptr = *self.table.get(parent).unwrap();
+        let mut res = self.borrow_node(parent, parent_ptr);
         let tracked _ = self.instance.borrow().weak_connections(self.spec.borrow());
         let tracked _ = lemma_view_acyclic(self.spec());
         assert(transitive_child_of(view(self.spec()), res.key(), parent));

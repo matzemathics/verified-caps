@@ -80,6 +80,16 @@ impl<Value> ActivityCapTable<Value> {
 #[verifier::reject_recursive_types(Value)]
 pub struct HashMetaCapTable<Value>(MutMap<ActId, ActivityCapTable<Value>>);
 
+impl<V> HashMetaCapTable<V> {
+    pub fn new() -> (r: Self)
+    ensures
+        r@.dom().is_empty(),
+        r.wf()
+    {
+        Self(MutMap::new())
+    }
+}
+
 impl<Value> View for HashMetaCapTable<Value> {
     type V = Map<CapKey, Value>;
 
