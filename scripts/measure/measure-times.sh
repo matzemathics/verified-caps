@@ -1,9 +1,16 @@
 #!/bin/zsh
 
-mkdir -p results/
+mkdir -p results/series
 
-for mod in $(cat scripts/measure/modules.txt)
+sudo cpupower frequency-set --governor performance
+
+for i in {1..10}
 do
-    cargo verus verify -- --verify-only-module $mod --time-expanded --output-json \
-        | jq ".[\"times-ms\"].verification.total" >> results/modules/$mod
+    echo "Run $i ..."
+    cargo verus verify -- \
+        --time-expanded \
+        --output-json \
+        > results/series/time-results-$i.json
 done
+
+sudo cpupower frequency-set --governor schedutil
