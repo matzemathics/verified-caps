@@ -2,6 +2,8 @@
 
 use std::{io::Error, process::exit};
 
+use meta::Node;
+use tables::ActivityCapTable;
 use vstd::prelude::*;
 
 pub extern crate alloc;
@@ -26,14 +28,19 @@ fn run() -> std::io::Result<()> {
     let n = arg.parse::<u64>().map_err(Error::other)?;
 
     let mut cap_system = meta::Meta::new();
+    let (table, _, _) = vstd::raw_ptr::allocate(
+        std::mem::size_of::<ActivityCapTable<*mut Node>>(),
+        std::mem::align_of::<ActivityCapTable<*mut Node>>(),
+    );
+    let table = table as *mut ActivityCapTable<*mut Node>;
 
-    cap_system.insert_root((0, 0));
+    cap_system.insert_root(table, (0, 0));
 
     for i in 0..n {
-        cap_system.insert_child((0, i), (0, i + 1));
+        cap_system.insert_child(table, table, (0, i), (0, i + 1));
     }
 
-    cap_system.revoke_children((0, 0));
+    cap_system.revoke_children(table, (0, 0));
 
     Ok(())
 }

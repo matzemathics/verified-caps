@@ -13,7 +13,7 @@ use std::{borrow::Borrow, ptr::null_mut};
 
 use vstd::{
     prelude::*,
-    raw_ptr::{self, allocate, deallocate, ptr_mut_read, ptr_mut_write, ptr_ref},
+    raw_ptr::{self, allocate, deallocate, ptr_mut_read, ptr_mut_write, ptr_ref, PointsTo},
 };
 
 verus! {
@@ -49,13 +49,16 @@ use crate::{
 use crate::{
     specs::cap_map::{ActId, CapId, CapKey},
     state::{LinkSystem, Token},
-    tables::{HashMetaCapTable, MetaCapTable},
+    tables::{ActivityCapTable, HashMetaCapTable, MetaCapTable},
 };
 
-struct Node {
+pub type ActTable = ActivityCapTable<*mut Node>;
+
+pub struct Node {
     next: *mut Node,
     child: *mut Node,
     back: *mut Node,
+    table: *mut ActTable,
     id: CapId,
     activity: ActId,
     first_child: bool,
@@ -74,7 +77,7 @@ impl Node {
     }
 }
 
-global layout Node is size == 40, align == 8;
+global layout Node is size == 48, align == 8;
 
 tracked struct NodePerm {
     pt: raw_ptr::PointsTo<Node>,
@@ -195,16 +198,36 @@ impl Meta {
             &&& #[trigger] self.tokens@.value()[key].ptr() == self.table@[key]
             &&& self.get(key).key() == key
         }
+        &&& forall|key: CapKey| #![auto] self.table@.contains_key(key) ==> {
+            self.activity_tables().contains_pair(self.get(key).activity, self.get(key).table)
+        }
     }
 
     pub closed spec fn view(&self) -> CapMap {
         view(self.spec())
     }
 
-    pub fn insert_root(&mut self, key: CapKey)
+    pub closed spec fn activity_tables(&self) -> Map<ActId, *mut ActTable> {
+        self.table.activities()
+    }
+
+    pub open spec fn correct_table_pointer(&self, activity: ActId, table: *mut ActTable) -> bool {
+        self.activity_tables().contains_key(activity) && self.activity_tables()[activity] == table
+    }
+
+    proof fn register_activity(tracked &mut self, activity: ActId, tracked permission: PointsTo<ActTable>)
+    requires !old(self).activity_tables().contains_key(activity)
+    ensures
+        self.activity_tables() == old(self).activity_tables().insert(activity, permission.ptr())
+    {
+        self.table.insert_table(activity, permission);
+    }
+
+    pub fn insert_root(&mut self, table: *mut ActTable, key: CapKey)
         requires
             !old(self)@.contains_key(key),
             old(self).wf(),
+            old(self).correct_table_pointer(key.0, table)
         ensures
             self.wf(),
     {
@@ -212,6 +235,7 @@ impl Meta {
             next: null_mut(),
             child: null_mut(),
             back: null_mut(),
+            table,
             first_child: false,
             activity: key.0,
             id: key.1
@@ -236,18 +260,21 @@ impl Meta {
             token,
         );
 
-        self.table.insert(key, ptr);
+        self.table.insert(table, key, ptr);
     }
 
     #[inline(never)]
-    pub fn insert_child(&mut self, parent: CapKey, child: CapKey)
+    pub fn insert_child(&mut self, table: *mut ActTable, parent_table: *mut ActTable, parent: CapKey, child: CapKey)
         requires
             old(self)@.contains_key(parent),
             !old(self)@.contains_key(child),
             old(self).wf(),
+            old(self).correct_table_pointer(parent.0, parent_table),
+            old(self).correct_table_pointer(child.0, table)
         ensures
             self.wf(),
             self@ == insert_child(old(self)@, parent, child),
+            old(self).activity_tables() == self.activity_tables(),
     {
         proof!{
             // needed later to show parent.next != child && parent.back != child
@@ -257,13 +284,14 @@ impl Meta {
             self.instance.borrow().weak_connections(self.spec.borrow());
         };
 
-        let parent_ptr = *self.table.get(parent).unwrap();
+        let parent_ptr = *self.table.get(parent_table, parent).unwrap();
         let parent_node = self.borrow_node(parent, parent_ptr);
 
         let node = Node {
             activity: child.0,
             id: child.1,
             next: parent_node.child,
+            table,
             child: null_mut(),
             back: parent_ptr,
             first_child: true
@@ -279,7 +307,7 @@ impl Meta {
         ptr_mut_write(ptr, Tracked(&mut pt), node);
         let tracked token = NodePerm { pt, dealloc };
 
-        self.table.insert(child, ptr);
+        self.table.insert(table, child, ptr);
 
         proof!{
             token.is_nonnull();
@@ -371,15 +399,17 @@ impl Meta {
         };
     }
 
-    pub fn revoke_single(&mut self, key: CapKey)
+    pub fn revoke_single(&mut self, table: *mut ActTable, key: CapKey)
         requires
             old(self).wf(),
             old(self)@.contains_key(key),
             old(self)@[key].children.len() == 0,
+            old(self).correct_table_pointer(key.0, table)
         ensures
             self.wf(),
             self@.dom() == old(self)@.dom().remove(key),
             self@ == revoke_single_parent_update(old(self)@, key).remove(key),
+            old(self).activity_tables() == self.activity_tables(),
     {
         let tracked _ = self.instance.borrow().clean_links(self.spec.borrow(), self.state.borrow());
         let tracked token = self.instance.borrow_mut().revoke_single(
@@ -389,7 +419,7 @@ impl Meta {
             self.state.borrow_mut(),
         );
 
-        let ptr = *self.table.get(key).unwrap();
+        let ptr = *self.table.get(table, key).unwrap();
         assert(ptr == token.ptr());
         let tracked _ = token.is_wf();
         let tracked NodePerm { pt: rev_pt, dealloc: rev_dealloc } = token;
@@ -449,7 +479,7 @@ impl Meta {
             );
         }
 
-        self.table.remove(key);
+        self.table.remove(table, key);
         let tracked rev_pt = rev_pt.into_raw();
         deallocate(ptr as _, size_of::<Node>(), align_of::<Node>(), Tracked(rev_pt), Tracked(rev_dealloc));
 
@@ -482,16 +512,18 @@ impl Meta {
         };
     }
 
-    pub fn revoke_children(&mut self, key: CapKey)
+    pub fn revoke_children(&mut self, table: *mut ActTable, key: CapKey)
         requires
             old(self).wf(),
             old(self)@.contains_key(key),
+            old(self).correct_table_pointer(key.0, table),
         ensures
             self.wf(),
             self@.contains_key(key),
             self@[key].children.len() == 0,
             self@.dom() == old(self)@.dom().difference(transitive_children(old(self)@, key)).insert(key),
             self@.remove(key) == old(self)@.remove_keys(transitive_children(old(self)@, key)),
+            old(self).activity_tables() == self.activity_tables(),
     {
         broadcast use vstd::set::group_set_axioms;
 
@@ -507,6 +539,7 @@ impl Meta {
         loop
             invariant
                 self.wf(),
+                self.correct_table_pointer(key.0, table),
                 self@.contains_key(key),
                 self.dom().disjoint(revoked_keys),
                 old(self).dom() == self.dom().union(revoked_keys),
@@ -514,12 +547,14 @@ impl Meta {
                 view(old(self).spec()).remove_keys(subtree) == view(self.spec()).remove_keys(
                     subtree,
                 ),
+                old(self).activity_tables() == self.activity_tables(),
             ensures
                 self.spec()[key].child.is_none(),
+                old(self).activity_tables() == self.activity_tables(),
             decreases
                 self.dom().len()
         {
-            let child = self.first_child(key);
+            let child = self.first_child(table, key);
             let tracked _ = self.lemma_child_null_imp_none(child);
 
             if child.activity == key.0 && child.id == key.1 {
@@ -534,7 +569,8 @@ impl Meta {
 
             let ghost pre = self.spec();
             assert(self@ == view(pre));
-            self.revoke_single(child.key());
+            assert(self.activity_tables().contains_pair(self.get(child.key()).activity, self.get(child.key()).table));
+            self.revoke_single(child.table, child.key());
             assert(view(pre).dom() == pre.dom());
             assert(self.dom() == pre.dom().remove(child.key()));
 
@@ -634,16 +670,17 @@ impl Meta {
         self.spec@.value()
     }
 
-    fn first_child(&self, parent: CapKey) -> (res: &Node)
+    fn first_child(&self, table: *mut ActTable, parent: CapKey) -> (res: &Node)
         requires
             self.wf(),
             self@.contains_key(parent),
+            self.correct_table_pointer(parent.0, table),
         ensures
             res.child@.addr == 0,
             self.contains(res),
             transitive_child_of(view(self.spec()), res.key(), parent),
     {
-        let parent_ptr = *self.table.get(parent).unwrap();
+        let parent_ptr = *self.table.get(table, parent).unwrap();
         let mut res = self.borrow_node(parent, parent_ptr);
         let tracked _ = self.instance.borrow().weak_connections(self.spec.borrow());
         let tracked _ = lemma_view_acyclic(self.spec());
@@ -689,19 +726,20 @@ impl Meta {
         res
     }
 
-    fn cap_in(&self, activity: ActId) -> (res: Option<CapKey>)
-    requires self.wf()
+    fn cap_in(&self, table: *mut ActTable, activity: ActId) -> (res: Option<CapKey>)
+    requires self.wf(), self.correct_table_pointer(activity, table)
     ensures
         res matches Some(key) ==> key.0 == activity && self.dom().contains(key),
         res matches None ==> self.dom().filter(|key: CapKey| key.0 == activity).is_empty()
     {
-        let act_table = self.table.get_act_table(activity)?;
+        let act_table = self.table.get_act_table(table, Ghost(activity));
         act_table.get_element()
     }
 
-    pub fn revoke_all(&mut self, activity: ActId)
+    pub fn revoke_all(&mut self, table: *mut ActTable, activity: ActId)
         requires
             old(self).wf(),
+            old(self).correct_table_pointer(activity, table)
         ensures
             self.wf(),
             self@.dom().filter(|key: CapKey| key.0 == activity).is_empty()
@@ -709,21 +747,21 @@ impl Meta {
         broadcast use vstd::set::group_set_axioms;
 
         loop
-            invariant self.wf()
+            invariant self.wf() && self.correct_table_pointer(activity, table)
             ensures self@.dom().filter(|key: CapKey| key.0 == activity).is_empty()
             decreases self.dom().len()
         {
-            let Some(cap) = self.cap_in(activity) else { break; };
+            let Some(cap) = self.cap_in(table, activity) else { break; };
             let ghost before = self.dom();
             assert(before.finite());
 
-            self.revoke_children(cap);
+            self.revoke_children(table, cap);
             let ghost here = self.dom();
             assert(self@.dom().subset_of(before));
             let tracked _ = lemma_len_subset(self.dom(), before);
             assert(self.dom().len() <= before.len());
 
-            self.revoke_single(cap);
+            self.revoke_single(table, cap);
             assert(self@.dom() =~= here.remove(cap));
             assert(self.dom() == here.remove(cap));
             assert(self.dom().len() == here.len() - 1);
