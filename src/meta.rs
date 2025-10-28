@@ -49,10 +49,10 @@ use crate::{
 use crate::{
     specs::cap_map::{ActId, CapId, CapKey},
     state::{LinkSystem, Token},
-    tables::{ActivityCapTable, HashMetaCapTable, MetaCapTable},
+    tables::{CapTable, HashCapTable, MetaCapTable, MetaCapTableImpl},
 };
 
-pub type ActTable = ActivityCapTable<*mut Node>;
+pub type ActTable = HashCapTable<*mut Node>;
 
 pub struct Node {
     next: *mut Node,
@@ -147,8 +147,10 @@ impl Token for NodePerm {
     }
 }
 
+type DefaultMetaTable = MetaCapTableImpl<HashCapTable<*mut Node>>;
+
 pub struct Meta {
-    table: HashMetaCapTable<*mut Node>,
+    table: DefaultMetaTable,
     instance: Tracked<LinkSystem::Instance<NodePerm>>,
     spec: Tracked<LinkSystem::map<NodePerm>>,
     tokens: Tracked<LinkSystem::all_tokens<NodePerm>>,
@@ -162,7 +164,7 @@ impl Meta {
         r.wf(),
         r@.dom().is_empty()
     {
-        let table = HashMetaCapTable::new();
+        let table = MetaCapTableImpl::new();
         let tracked (
             Tracked(instance),
             Tracked(map),
@@ -732,8 +734,9 @@ impl Meta {
         res matches Some(key) ==> key.0 == activity && self.dom().contains(key),
         res matches None ==> self.dom().filter(|key: CapKey| key.0 == activity).is_empty()
     {
-        let act_table = self.table.get_act_table(table, Ghost(activity));
-        act_table.get_element()
+        let act_table = self.table.get_act_table(table, activity);
+        let cap_id = act_table.get_element()?;
+        Some((activity, cap_id))
     }
 
     pub fn revoke_all(&mut self, table: *mut ActTable, activity: ActId)

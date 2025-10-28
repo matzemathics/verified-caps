@@ -14,17 +14,52 @@ use crate::{
     specs::cap_map::{ActId, CapId, CapKey},
 };
 
-mod cell_map;
-use cell_map::MutMap;
-
 use std::{borrow::Borrow, collections::HashMap};
 
 verus! {
 
 broadcast use vstd::std_specs::hash::group_hash_axioms;
 
+// then_some
+pub open spec fn spec_then_some<T>(c: bool, t: T) -> Option<T> {
+    match c {
+        true => Some(t),
+        false => None
+    }
+}
+
+#[verifier::when_used_as_spec(spec_then_some)]
+pub assume_specification<T>[ bool::then_some ](c: bool, t: T) -> (r: Option<T>)
+    returns
+        spec_then_some(c, t),
+;
+
+pub trait CapTable: View<V = Map<CapId, Self::Cap>> {
+    type Cap;
+
+    fn get_element(&self) -> (res: Option<CapId>)
+    ensures
+        res matches Some(value) ==> self@.contains_key(value),
+        res matches None ==> self@.is_empty();
+
+    fn insert(&mut self, key: CapId, value: Self::Cap)
+    ensures
+        self@ == old(self)@.insert(key, value),
+        ;
+
+    fn remove(&mut self, key: CapId)
+    ensures
+        self@ == old(self)@.remove(key),
+        ;
+
+    fn get(&self, key: CapId) -> (result: Option<&Self::Cap>)
+    ensures
+        result matches Some(v) ==> self@.contains_key(key@) && *v == self@[key@],
+        result matches None ==> !self@.contains_key(key@);
+}
+
 pub trait MetaCapTable<Value>: View<V = Map<CapKey, Value>> {
-    type ActTable : View<V = Map<CapKey, Value>>;
+    type ActTable : CapTable<Cap = Value>;
 
     spec fn activities(&self) -> Map<ActId, *mut Self::ActTable>;
 
@@ -65,48 +100,65 @@ pub trait MetaCapTable<Value>: View<V = Map<CapKey, Value>> {
 
     spec fn wf(&self) -> bool;
 
-    fn get_act_table(&self, table: *mut Self::ActTable, act: Ghost<ActId>) -> (result: &Self::ActTable)
+    fn get_act_table(&self, table: *mut Self::ActTable, act: ActId) -> (result: &Self::ActTable)
         requires
             self.wf(),
-            self.activities().contains_pair(act@, table),
+            self.activities().contains_pair(act, table),
         ensures
-            self@.restrict(Set::new(|k: CapKey| k.0 == act@)) == result@,
+            self@.dom()
+                .filter(|k: CapKey| k.0 == act)
+                .map(|k: CapKey| k.1) == result@.dom(),
+            result@.is_empty() ==> self@.dom().filter(|k: CapKey| k.0 == act).is_empty()
             ;
 }
 
-pub struct ActivityCapTable<Value> {
-    activity_id: ActId,
+pub struct HashCapTable<Value> {
     caps: HashMap<CapId, Value>
 }
 
-impl<Value> View for ActivityCapTable<Value> {
-    type V = Map<CapKey, Value>;
-
-    closed spec fn view(&self) -> Self::V {
-        Map::new(
-            |key: CapKey| key.0 == self.activity_id && self.caps@.contains_key(key.1),
-            |key: CapKey| self.caps@[key.1])
+impl<Value> HashCapTable<Value> {
+    pub fn new() -> Self {
+        Self { caps: HashMap::new() }
     }
 }
 
-impl<Value> ActivityCapTable<Value> {
-    pub fn get_element(&self) -> (res: Option<CapKey>)
-    ensures
-        res matches Some(value) ==> self@.contains_key(value),
-        res matches None ==> self@.is_empty()
+impl<Value> View for HashCapTable<Value> {
+    type V = Map<CapId, Value>;
+
+    closed spec fn view(&self) -> Self::V {
+        self.caps@
+    }
+}
+
+impl<Value> CapTable for HashCapTable<Value> {
+    type Cap = Value;
+
+    fn get_element(&self) -> (res: Option<CapId>)
     {
         let mut iter = self.caps.keys();
         let cap =  iter.next()?;
-        Some((self.activity_id, *cap))
+        Some(*cap)
+    }
+
+    fn insert(&mut self, key: CapId, value: Self::Cap) {
+        self.caps.insert(key, value);
+    }
+
+    fn remove(&mut self, key: CapId) {
+        self.caps.remove(&key);
+    }
+
+    fn get(&self, key: CapId) -> (result: Option<&Self::Cap>)
+    {
+        self.caps.get(&key)
     }
 }
 
-#[verifier::reject_recursive_types(Value)]
-pub struct HashMetaCapTable<Value> {
-    tokens: Tracked<Map<ActId, PointsTo<ActivityCapTable<Value>>>>
+pub struct MetaCapTableImpl<T: CapTable> {
+    tokens: Tracked<Map<ActId, PointsTo<T>>>
 }
 
-impl<V> HashMetaCapTable<V> {
+impl<T: CapTable> MetaCapTableImpl<T> {
     pub fn new() -> (r: Self)
     ensures
         r@.dom().is_empty(),
@@ -116,36 +168,21 @@ impl<V> HashMetaCapTable<V> {
     }
 }
 
-impl<Value> View for HashMetaCapTable<Value> {
-    type V = Map<CapKey, Value>;
+impl<T: CapTable> View for MetaCapTableImpl<T> {
+    type V = Map<CapKey, T::Cap>;
 
     closed spec fn view(&self) -> Self::V {
         Map::new(
             |key: CapKey| {
                 &&& self.tokens@.contains_key(key.0)
-                &&& self.tokens@[key.0].value().caps@.contains_key(key.1)
+                &&& self.tokens@[key.0].value()@.contains_key(key.1)
             },
-            |key: CapKey| self.tokens@[key.0].value().caps@[key.1])
+            |key: CapKey| self.tokens@[key.0].value()@[key.1])
     }
 }
 
-impl<Value> HashMetaCapTable<Value> {
-    spec fn wf_activity(&self, act: ActId) -> bool {
-        &&& self.tokens@[act].value().activity_id == act
-        &&& self.tokens@[act].is_init()
-        &&& self@.restrict(Set::new(|key: CapKey| key.0 == act)) == self.tokens@[act].value()@
-    }
-
-    proof fn wf_activity_from_wf(&self, act: ActId)
-        requires self.wf() && self.tokens@.contains_key(act)
-        ensures self.wf_activity(act)
-    {
-        assert(self.tokens@[act].value().activity_id == act);
-        assert(self.tokens@[act].is_init());
-        assert(self@.restrict(Set::new(|key: CapKey| key.0 == act)) == self.tokens@[act].value()@);
-    }
-
-    broadcast proof fn contains_pt(&self, act: ActId, table: *mut ActivityCapTable<Value>)
+impl<T: CapTable> MetaCapTableImpl<T> {
+    broadcast proof fn contains_pt(&self, act: ActId, table: *mut T)
         requires #[trigger] self.activities().contains_pair(act, table),
         ensures
             self.tokens@.contains_key(act),
@@ -153,54 +190,55 @@ impl<Value> HashMetaCapTable<Value> {
     {}
 }
 
-impl<Value> MetaCapTable<Value> for HashMetaCapTable<Value> {
-    type ActTable = ActivityCapTable<Value>;
+impl<T: CapTable> MetaCapTable<T::Cap> for MetaCapTableImpl<T> {
+    type ActTable = T;
 
-    fn insert(&mut self, table_ptr: *mut ActivityCapTable<Value>, k: CapKey, v: Value)
+    fn insert(&mut self, table_ptr: *mut T, k: CapKey, v: T::Cap)
     {
         proof! { self.contains_pt(k.0, table_ptr) };
         let tracked token = self.tokens.borrow_mut().tracked_remove(k.0);
         let mut table = ptr_mut_read(table_ptr, Tracked(&mut token));
-        table.caps.insert(k.1, v);
+        table.insert(k.1, v);
         ptr_mut_write(table_ptr, Tracked(&mut token), table);
         let tracked _ = self.tokens.borrow_mut().tracked_insert(k.0, token);
-
-        assert(forall |act: ActId| #![auto]
-            self.tokens@.contains_key(act) ==> self@.restrict(Set::new(|key: CapKey| key.0 == act)) == self.tokens@[act].value()@);
         assert(self@ =~= old(self)@.insert(k@, v));
     }
 
-    fn remove(&mut self, table_ptr: *mut ActivityCapTable<Value>, k: CapKey)
+    fn remove(&mut self, table_ptr: *mut T, k: CapKey)
     {
         let tracked token = self.tokens.borrow_mut().tracked_remove(k.0);
         let mut table = ptr_mut_read(table_ptr, Tracked(&mut token));
-        table.caps.remove(&k.1);
+        table.remove(k.1);
         ptr_mut_write(table_ptr, Tracked(&mut token), table);
         let tracked _ = self.tokens.borrow_mut().tracked_insert(k.0, token);
-
-        assert(forall |act: ActId|  #![auto]
-            self.tokens@.contains_key(act) ==> self@.restrict(Set::new(|key: CapKey| key.0 == act)) == self.tokens@[act].value()@);
         assert(self@ =~= old(self)@.remove(k@));
     }
 
-    fn get(&self, table: *mut ActivityCapTable<Value>, k: CapKey) -> (result: Option<&Value>)
+    fn get(&self, table: *mut T, k: CapKey) -> (result: Option<&T::Cap>)
     {
         let tracked token = self.tokens.borrow().tracked_borrow(k.0);
         let table = ptr_ref(table, Tracked(token));
-        table.caps.get(&k.1)
+        table.get(k.1)
     }
 
     closed spec fn wf(&self) -> bool {
         forall |act: ActId| #![auto] self.tokens@.contains_key(act) ==> {
-            &&& self.tokens@[act].value().activity_id == act
             &&& self.tokens@[act].is_init()
-            &&& self@.restrict(Set::new(|key: CapKey| key.0 == act)) == self.tokens@[act].value()@
         }
     }
 
-    fn get_act_table(&self, table: *mut ActivityCapTable<Value>, act: Ghost<ActId>) -> (result: &Self::ActTable)
+    fn get_act_table(&self, table: *mut T, act: ActId) -> &Self::ActTable
     {
-        ptr_ref(table, Tracked(self.tokens.borrow().tracked_borrow(act@)))
+        let res = ptr_ref(table, Tracked(self.tokens.borrow().tracked_borrow(act@)));
+
+        proof!{
+            let a = self@.dom().filter(|k: CapKey| k.0 == act@);
+            assert forall |k: CapId| #![auto] res@.contains_key(k)
+            implies a.map(|ck: CapKey| ck.1).contains(k)
+            by { assert(a.contains((act@, k))); };
+        };
+
+        res
     }
 
     closed spec fn activities(&self) -> Map<ActId, *mut Self::ActTable> {
