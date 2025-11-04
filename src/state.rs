@@ -17,14 +17,22 @@ use crate::specs::link_map::{decreasing, next_index, Child, LinkedNode, Next};
 use crate::specs::link_map::LinkMap;
 use crate::specs::cap_map::CapKey;
 
+/// Tagged union representing the state of a link
+/// during an update operation
 pub ghost enum LinkState {
+    /// The link was null, so does not need to be updated
     Null,
+    /// The link was *not* null, and still needs to be updated
     Unchanged(CapKey),
+    /// The link is in the process of being updated
+    /// (ownership has been taken)
     Taken(CapKey),
+    /// The link has been updated successfully
     Fixed(CapKey),
 }
 
 impl LinkState {
+    /// The set of keys, whose ownership has been taken
     pub open spec fn dom(&self) -> Set<CapKey> {
         match self {
             LinkState::Taken(key) => set![*key],
@@ -32,6 +40,7 @@ impl LinkState {
         }
     }
 
+    /// Has the update been applied
     pub open spec fn fixed(&self) -> bool {
         match self {
             LinkState::Null => true,
@@ -41,6 +50,7 @@ impl LinkState {
         }
     }
 
+    /// The target of the link at the current point in time
     pub open spec fn key(&self) -> Option<CapKey> {
         match self {
             LinkState::Null => None,
@@ -51,14 +61,20 @@ impl LinkState {
     }
 }
 
+/// The global state of ongoing operations,
+/// i.e. which links are currently being modified
 #[allow(inconsistent_fields)]
 pub ghost enum SysState {
+    /// No updates in progress, everything linked correctly
     Clean,
+    /// Insertion operation in progress
     InsertChild { inserted: CapKey, parent: CapKey, next: LinkState },
+    /// Revocation operation in progress
     RevokeSingle { key: CapKey, back: LinkState, next: LinkState, first_child: bool },
 }
 
 impl SysState {
+    /// The set of keys, whose ownership has been taken
     pub open spec fn dom(self) -> Set<CapKey> {
         match self {
             SysState::Clean => Set::empty(),
@@ -69,7 +85,8 @@ impl SysState {
         }
     }
 
-    pub open spec fn allow_broken_back_link(self, key: CapKey, target: CapKey) -> bool {
+    /// Whether the `back` link of the node at `key` is allowed to be outdated
+    pub open spec fn allow_broken_back_link(self, key: CapKey) -> bool {
         match self {
             SysState::Clean => false,
             SysState::InsertChild { inserted, parent, next } => key == inserted,
@@ -79,7 +96,8 @@ impl SysState {
         }
     }
 
-    pub open spec fn allow_broken_next_link(self, key: CapKey, target: CapKey) -> bool {
+    /// Whether the `next` link of the node at `key` is allowed to be outdated
+    pub open spec fn allow_broken_next_link(self, key: CapKey) -> bool {
         match self {
             SysState::Clean => false,
             SysState::InsertChild { inserted, parent, next } => key == inserted && !next.fixed(),
@@ -89,7 +107,8 @@ impl SysState {
         }
     }
 
-    pub open spec fn allow_broken_child_link(self, key: CapKey, target: CapKey) -> bool {
+    /// Whether the `child` link of the node at `key` is allowed to be outdated
+    pub open spec fn allow_broken_child_link(self, key: CapKey) -> bool {
         match self {
             SysState::Clean => false,
             SysState::InsertChild { inserted, parent, next } => key == parent && next.fixed(),
@@ -100,69 +119,61 @@ impl SysState {
     }
 }
 
+/// The `back` link of `map[key]` upholds the invariants required at `state`
 pub open spec fn back_link_condition(state: SysState, map: LinkMap, key: CapKey) -> bool {
-    if map[key].back.is_none() {
-        true
-    } else {
-        let back = map[key].back.unwrap();
-        {
-            &&& back != key
-            &&& map.contains_key(back)
-            &&& map[key].first_child ==> map[key].depth == map[back].depth + 1
-            &&& map[key].first_child || (map[key].depth == map[back].depth && map[key].index
-                < map[back].index)
-            &&& (state.allow_broken_back_link(key, back) || {
-                match map[key].first_child {
-                    true => map[back].child == Some(key),
-                    false => map[back].next == Some(key),
-                }
-            })
-        }
+    map[key].back matches Some(back) ==> {
+        &&& back != key
+        &&& map.contains_key(back)
+        &&& map[key].first_child ==> map[key].depth == map[back].depth + 1
+        &&& map[key].first_child || (map[key].depth == map[back].depth && map[key].index
+            < map[back].index)
+        &&& (state.allow_broken_back_link(key) || {
+            match map[key].first_child {
+                true => map[back].child == Some(key),
+                false => map[back].next == Some(key),
+            }
+        })
     }
 }
 
+/// The `next` link of `map[key]` upholds the invariants required at `state`
 pub open spec fn next_link_condition(state: SysState, map: LinkMap, key: CapKey) -> bool {
-    if map[key].next.is_none() {
-        true
-    } else {
-        let next = map[key].next.unwrap();
-        {
-            &&& next != key
-            &&& map.contains_key(next)
-            &&& map[key].depth == map[next].depth && map[key].index > map[next].index
-            &&& (state.allow_broken_next_link(key, next) || {
-                map[next].back == Some(key) && map[next].first_child == false
-            })
-        }
+    map[key].next matches Some(next) ==> {
+        &&& next != key
+        &&& map.contains_key(next)
+        &&& map[key].depth == map[next].depth && map[key].index > map[next].index
+        &&& (state.allow_broken_next_link(key) || {
+            map[next].back == Some(key) && map[next].first_child == false
+        })
     }
 }
 
+/// The `child` link of `map[key]` upholds the invariants required at `state`
 pub open spec fn child_link_condition(state: SysState, map: LinkMap, key: CapKey) -> bool {
-    if map[key].child.is_none() {
-        true
-    } else {
-        let child = map[key].child.unwrap();
-        {
-            &&& child != key
-            &&& map.contains_key(child)
-            &&& map[key].depth + 1 == map[child].depth
-            &&& (state.allow_broken_child_link(key, child) || {
-                map[child].back == Some(key) && map[child].first_child == true
-            })
-        }
+    map[key].child matches Some(child) ==> {
+        &&& child != key
+        &&& map.contains_key(child)
+        &&& map[key].depth + 1 == map[child].depth
+        &&& (state.allow_broken_child_link(key) || {
+            map[child].back == Some(key) && map[child].first_child == true
+        })
     }
 }
 
+/// A ghost type that acts as a permission token for a pointer
 pub trait Token: Sized {
     type Inner;
 
+    /// The pointer guarded by this permission token
     spec fn ptr(&self) -> *mut Self::Inner;
 
+    /// Proof that the address is non-null
     proof fn is_nonnull(tracked &self)
         ensures
             self.ptr()@.addr != 0,
     ;
 
+    /// Invariant that shall be upheld
     spec fn cond(
         &self,
         next: *mut Self::Inner,
@@ -172,6 +183,7 @@ pub trait Token: Sized {
     ) -> bool;
 }
 
+/// Lifts the invariant specified by `Token::cond` into the `LinkMap` model
 pub open spec fn token_invariant<T: Token>(
     map: LinkMap,
     tokens: Map<CapKey, T>,
@@ -198,20 +210,24 @@ pub open spec fn token_invariant<T: Token>(
     tokens[key].cond(next, child, back, map[key].first_child)
 }
 
+
+/// The `back` link of `map[key]` has been correctly updated upon revoke
 pub open spec fn revoke_back_fixed(map: LinkMap, key: CapKey) -> bool {
-    map[key].back == Option::<CapKey>::None || {
-        ||| (map[key].first_child && map[map[key].back.unwrap()].child == map[key].next)
-        ||| (!map[key].first_child && map[map[key].back.unwrap()].next == map[key].next)
+    map[key].back matches Some(back) ==> {
+        ||| (map[key].first_child && map[back].child == map[key].next)
+        ||| (!map[key].first_child && map[back].next == map[key].next)
     }
 }
 
+/// The `next` link of `map[key]` has been correctly updated upon revoke
 pub open spec fn revoke_next_fixed(map: LinkMap, key: CapKey) -> bool {
-    map[key].next == Option::<CapKey>::None || {
-        &&& map[key].first_child == map[map[key].next.unwrap()].first_child
-        &&& map[key].back == map[map[key].next.unwrap()].back
+    map[key].next matches Some(next) ==> {
+        &&& map[key].first_child == map[next].first_child
+        &&& map[key].back == map[next].back
     }
 }
 
+/// All links of `map` satisfy the invariants of `state`
 pub open spec fn link_condition(state: SysState, map: LinkMap) -> bool {
     forall|key: CapKey|
         #![trigger map[key].child]
