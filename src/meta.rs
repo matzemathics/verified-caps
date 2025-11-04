@@ -52,15 +52,25 @@ use crate::{
     tables::{CapTable, HashCapTable, MetaCapTable, MetaCapTableImpl},
 };
 
+/// The type of Capability table used for each activity.
 pub type ActTable = HashCapTable<*mut Node>;
 
+/// The capability node
 pub struct Node {
+    /// The next sibling of the node
     next: *mut Node,
+    /// The first child of the node
     child: *mut Node,
+    /// The last sibling (if `first_child` is `false`)
+    /// or parent of the node
     back: *mut Node,
+    /// The table this node belongs to
     table: *mut ActTable,
+    /// The id of this node in its capability table
     id: CapId,
+    /// The activity id this node belongs to
     activity: ActId,
+    /// Whether this node is a first child
     first_child: bool,
 }
 
@@ -79,6 +89,7 @@ impl Node {
 
 global layout Node is size == 48, align == 8;
 
+/// The permission tokens for pointers to [`Node`]
 tracked struct NodePerm {
     pt: raw_ptr::PointsTo<Node>,
     dealloc: raw_ptr::Dealloc,
@@ -149,6 +160,9 @@ impl Token for NodePerm {
 
 type DefaultMetaTable = MetaCapTableImpl<HashCapTable<*mut Node>>;
 
+/// The main API of this crate.
+/// It guards all operations on the capability system.
+/// This struct is purely ghost (i.e. compiles to a ZST).
 pub struct Meta {
     table: DefaultMetaTable,
     instance: Tracked<LinkSystem::Instance<NodePerm>>,
@@ -159,6 +173,7 @@ pub struct Meta {
 }
 
 impl Meta {
+    /// Create a new capability system
     pub fn new() -> (r: Self)
     ensures
         r.wf(),
@@ -190,6 +205,7 @@ impl Meta {
         &&& self.generation@.instance_id() == self.instance@.id()
     }
 
+    /// Internal well-formedness invariant upheld by this system in between operations.
     pub closed spec fn wf(&self) -> bool {
         &&& self.ties()
         &&& self.dom().finite()
@@ -205,18 +221,22 @@ impl Meta {
         }
     }
 
+    /// View of the capability system.
     pub closed spec fn view(&self) -> CapMap {
         view(self.spec())
     }
 
+    /// Map of capability tables registered with this system.
     pub closed spec fn activity_tables(&self) -> Map<ActId, *mut ActTable> {
         self.table.activities()
     }
 
+    /// Asserts that `table` was registered with id `activity`.
     pub open spec fn correct_table_pointer(&self, activity: ActId, table: *mut ActTable) -> bool {
         self.activity_tables().contains_key(activity) && self.activity_tables()[activity] == table
     }
 
+    /// Register a new `activity` and take logical ownership of its capability table.
     proof fn register_activity(tracked &mut self, activity: ActId, tracked permission: PointsTo<ActTable>)
     requires !old(self).activity_tables().contains_key(activity)
     ensures
@@ -225,6 +245,7 @@ impl Meta {
         self.table.insert_table(activity, permission);
     }
 
+    /// Insert a new capability node without parent.
     pub fn insert_root(&mut self, table: *mut ActTable, key: CapKey)
         requires
             !old(self)@.contains_key(key),
@@ -265,7 +286,7 @@ impl Meta {
         self.table.insert(table, key, ptr);
     }
 
-    #[inline(never)]
+    /// Insert a new capability node as a child of `parent`.
     pub fn insert_child(&mut self, table: *mut ActTable, parent_table: *mut ActTable, parent: CapKey, child: CapKey)
         requires
             old(self)@.contains_key(parent),
@@ -401,6 +422,7 @@ impl Meta {
         };
     }
 
+    /// Revoke a single capability node, which has no children.
     pub fn revoke_single(&mut self, table: *mut ActTable, key: CapKey)
         requires
             old(self).wf(),
@@ -514,6 +536,7 @@ impl Meta {
         };
     }
 
+    /// Revoke all children of a capability node.
     pub fn revoke_children(&mut self, table: *mut ActTable, key: CapKey)
         requires
             old(self).wf(),
@@ -632,7 +655,7 @@ impl Meta {
         );
     }
 
-    #[inline]
+    /// Get a reference to a capability node from a pointer.
     fn borrow_node(&self, key: CapKey, ptr: *mut Node) -> (res: &Node)
         requires
             self.wf(),
@@ -672,6 +695,7 @@ impl Meta {
         self.spec@.value()
     }
 
+    /// Returns the first transitive child of a capability node which itself has no children.
     fn first_child(&self, table: *mut ActTable, parent: CapKey) -> (res: &Node)
         requires
             self.wf(),
@@ -728,6 +752,7 @@ impl Meta {
         res
     }
 
+    /// Returns an arbitrary capability in `table`.
     fn cap_in(&self, table: *mut ActTable, activity: ActId) -> (res: Option<CapKey>)
     requires self.wf(), self.correct_table_pointer(activity, table)
     ensures
@@ -739,6 +764,7 @@ impl Meta {
         Some((activity, cap_id))
     }
 
+    /// Revoke all capability nodes in `table`.
     pub fn revoke_all(&mut self, table: *mut ActTable, activity: ActId)
         requires
             old(self).wf(),
@@ -804,7 +830,6 @@ impl Meta {
         ensures
             self.spec()[node.key()].child.is_none(),
     {
-        // prove that key.child == None in this case
         let child_key = self.spec()[node.key()].child;
         if child_key.is_some() {
             self.instance.borrow().token_invariant(
@@ -830,7 +855,6 @@ impl Meta {
         ensures
             self.spec()[node.key()].back.is_none(),
     {
-        // prove that key.back == None in this case
         let back_key = self.spec()[node.key()].back;
         if back_key.is_some() {
             self.instance.borrow().token_invariant(
