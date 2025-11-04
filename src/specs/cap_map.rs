@@ -23,6 +23,7 @@ pub ghost struct CapNode {
     pub children: Seq<CapKey>,
 }
 
+/// The key of the node which is the parent of `child` in `map`
 pub open spec fn get_parent(map: CapMap, child: CapKey) -> Option<CapKey> {
     if exists |parent: CapKey| edge(map, parent, child) {
         Some(choose |parent: CapKey| edge(map, parent, child))
@@ -31,14 +32,17 @@ pub open spec fn get_parent(map: CapMap, child: CapKey) -> Option<CapKey> {
     }
 }
 
+/// Whether `map` contains an edge from `parent` to `child`
 pub open spec fn edge(map: CapMap, parent: CapKey, child: CapKey) -> bool {
     map.contains_key(parent) && map[parent].children.contains(child)
 }
 
+/// Whether `a` and `b` are siblings
 pub open spec fn sibling_of(map: CapMap, a: CapKey, b: CapKey) -> bool {
     get_parent(map, a) == get_parent(map, b)
 }
 
+/// Whether `f` is a valid depth function for `map`
 pub open spec fn depth_fn(f: spec_fn(CapKey) -> nat, map: CapMap) -> bool {
     forall |p: CapKey, key: CapKey|
         map.contains_key(key) &&
@@ -47,21 +51,25 @@ pub open spec fn depth_fn(f: spec_fn(CapKey) -> nat, map: CapMap) -> bool {
         ==> f(key) == f(p) + 1
 }
 
+/// The depth of the node at `key` in `map`
 pub open spec fn depth(map: CapMap, key: CapKey) -> nat {
     let depth = choose |f: spec_fn(CapKey) -> nat| depth_fn(f, map);
     depth(key)
 }
 
+/// Whether `map` is acyclic
 pub open spec fn acyclic(map: CapMap) -> bool {
     exists |f: spec_fn(CapKey) -> nat| depth_fn(f, map)
 }
 
+/// Whether each node in `map` has at most one predecessor
 pub open spec fn tree_ish(map: CapMap) -> bool {
     forall |k: CapKey| map.contains_key(k)
     ==> parents(map, k).finite() &&
      #[trigger] parents(map, k).len() <= 1
 }
 
+/// The set of predecessors of the node at `key` in `map`
 pub open spec fn parents(map: CapMap, key: CapKey) -> Set<CapKey> {
     Set::new(|parent: CapKey| edge(map, parent, key))
 }
@@ -75,6 +83,7 @@ proof fn transitive_child_of_decreases(map: CapMap, child: CapKey, parent: CapKe
     }
 }
 
+/// Whether `child` is a transitive descendent of `parent`
 pub open spec fn transitive_child_of(map: CapMap, child: CapKey, parent: CapKey) -> bool
     decreases depth(map, child),
     when acyclic(map) && map.contains_key(child)
@@ -92,10 +101,13 @@ pub open spec fn transitive_child_of(map: CapMap, child: CapKey, parent: CapKey)
     }
 }
 
+/// The set of transitive children of `parent`,
+/// i.e. the subtree induced by `parent`
 pub open spec fn transitive_children(map: CapMap, parent: CapKey) -> Set<CapKey> {
     map.dom().filter(|node| transitive_child_of(map, node, parent))
 }
 
+/// Specification of inserting a child into `map`
 pub open spec fn insert_child(map: CapMap, parent: CapKey, child: CapKey) -> CapMap {
     let CapNode { children } = map[parent];
     let parent_node = CapNode { children: children.push(child) };
@@ -103,6 +115,7 @@ pub open spec fn insert_child(map: CapMap, parent: CapKey, child: CapKey) -> Cap
     map.insert(parent, parent_node).insert(child, child_node)
 }
 
+/// Specification of revoking a single key
 pub open spec fn revoke_single_parent_update(before: CapMap, removed: CapKey) -> CapMap {
     if let Some(parent) = get_parent(before, removed) {
         let parent_node = before[parent];
