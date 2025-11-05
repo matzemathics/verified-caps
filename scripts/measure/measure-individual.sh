@@ -9,7 +9,7 @@ MODULES=(
     "lemmas::revoke_view"
     "state::LinkSystem"
     "state::LinkSystem"
-    "state::LinkSystem"
+    "meta"
     "state::LinkSystem"
 )
 
@@ -21,9 +21,9 @@ FUNCTIONS=(
     "State::insert_child_finish_next_inductive"
     "lemma_revoke_spec"
     "State::finish_insert_inductive"
-    "State::finish_revoke_single_inductive"
     "State::revoke_take_back_inductive"
-    "State::finish_insert_asserts"
+    "Meta::revoke_children"
+    "State::insert_root_inductive"
 )
 
 mkdir -p results/functions
@@ -32,6 +32,7 @@ for I in {1..${#MODULES}}
 do
     echo "Verifying ${MODULES[I]}::${FUNCTIONS[I]}"
 
+    setarch `uname -m` -R -- \
     cargo verus verify -- \
         --verify-only-module ${MODULES[I]} \
         --verify-function=${FUNCTIONS[I]} \
@@ -42,9 +43,9 @@ do
         | select(.module == $ARGS.positional[0])
         ."function-breakdown".[]
         | select(.function|endswith($ARGS.positional[1]))
+        ."time-micros"
         ' ${MODULES[I]} ${FUNCTIONS[I]} \
-    | tee -a results/individual-rlmits.json
-    # | tee -a results/functions/${MODULES[I]}--${FUNCTIONS[I]}
+    | tee -a results/functions/${MODULES[I]}--${FUNCTIONS[I]}
 
 done
 
