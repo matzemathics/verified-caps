@@ -269,8 +269,8 @@ tokenized_state_machine!(LinkSystem<T: Token>{
 
     #[invariant]
     pub fn token_invariant(&self) -> bool {
-        forall |key: CapKey| #[trigger] self.map.contains_key(key) ==>
-            token_invariant(self.map, self.all_tokens, key)
+        forall |key: CapKey| self.map.contains_key(key) ==>
+            #[trigger] token_invariant(self.map, self.all_tokens, key)
     }
 
     #[invariant]
@@ -398,6 +398,9 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     #[inductive(insert_root)]
     fn insert_root_inductive(pre: Self, post: Self, key: CapKey, token: T) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+        assert forall |key: CapKey| pre.map.contains_key(key)
+        implies #[trigger] token_invariant(post.map, post.all_tokens, key)
+        by { assert(token_invariant(pre.map, pre.all_tokens, key)) };
     }
 
     transition!{
@@ -474,8 +477,8 @@ tokenized_state_machine!(LinkSystem<T: Token>{
                 &&& next.key().is_none() || next.fixed()
                     || (!self.map[next.key().unwrap()].first_child && self.map[next.key().unwrap()].back == Some(key))
                 &&& next.key().is_none() || next.key() != back.key()
-                &&& back.fixed() <==> revoke_back_fixed(self.map, key)
-                &&& next.fixed() <==> revoke_next_fixed(self.map, key)
+                &&& back.fixed() ==> revoke_back_fixed(self.map, key)
+                &&& next.fixed() ==> revoke_next_fixed(self.map, key)
             }
             _ => true
         }
@@ -485,6 +488,10 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     fn insert_child_inductive(pre: Self, post: Self, t: T, key: CapKey, parent: CapKey) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
         assert(next_link_condition(post.state, post.map, key));
+
+        assert forall |key: CapKey| pre.map.contains_key(key)
+        implies #[trigger] token_invariant(post.map, post.all_tokens, key)
+        by { assert(token_invariant(pre.map, pre.all_tokens, key)) };
     }
 
     transition! {
@@ -534,6 +541,9 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     #[inductive(insert_child_finish_next)]
     fn insert_child_finish_next_inductive(pre: Self, post: Self, token: T, inserted: CapKey, parent: CapKey, next: CapKey) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+        assert forall |key: CapKey| pre.map.contains_key(key)
+        implies #[trigger] token_invariant(post.map, post.all_tokens, key)
+        by { assert(token_invariant(pre.map, pre.all_tokens, key)) };
     }
 
     transition! {
@@ -562,6 +572,9 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     #[inductive(finish_insert)]
     fn finish_insert_inductive(pre: Self, post: Self, p: T, inserted: CapKey, parent: CapKey) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+        assert forall |key: CapKey| pre.map.contains_key(key)
+        implies #[trigger] token_invariant(post.map, post.all_tokens, key)
+        by { assert(token_invariant(pre.map, pre.all_tokens, key)) };
     }
 
     transition! {
@@ -677,6 +690,9 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     #[inductive(revoke_put_back)]
     fn revoke_put_back_inductive(pre: Self, post: Self, t: T) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+        assert forall |key: CapKey| pre.map.contains_key(key)
+        implies #[trigger] token_invariant(post.map, post.all_tokens, key)
+        by { assert(token_invariant(pre.map, pre.all_tokens, key)) };
     }
 
     transition! {
@@ -712,6 +728,9 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     #[inductive(revoke_put_next)]
     fn revoke_put_next_inductive(pre: Self, post: Self, t: T) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+        assert forall |key: CapKey| pre.map.contains_key(key)
+        implies #[trigger] token_invariant(post.map, post.all_tokens, key)
+        by { assert(token_invariant(pre.map, pre.all_tokens, key)) };
     }
 
     transition! {
@@ -730,6 +749,9 @@ tokenized_state_machine!(LinkSystem<T: Token>{
     #[inductive(finish_revoke_single)]
     fn finish_revoke_single_inductive(pre: Self, post: Self, removed: CapKey) {
         assert(post.map.dom() =~= post.tokens.dom().union(post.state.dom()));
+        assert forall |key: CapKey| pre.map.contains_key(key) && key != removed
+        implies #[trigger] token_invariant(post.map, post.all_tokens, key)
+        by { assert(token_invariant(pre.map, pre.all_tokens, key)) };
     }
 });
 
